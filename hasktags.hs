@@ -227,7 +227,6 @@ findthings ignoreCloseImpl filename = do
         --  then remove {- -} comments
         --  split by lines again ( to get indent
         let (lines , numbers) = unzip . fromLiterate filename $ zip aslines [0..]
-        putStrLn $ unlines lines
         let tokenLines =
                       stripNonHaskellLines
                       $ stripslcomments
