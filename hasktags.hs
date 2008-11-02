@@ -418,7 +418,7 @@ getTopLevelIndent (x:xs) = if (any ((=="import") . tokenString) x)
 fromLiterate :: FilePath -> [(String, Int)] -> [(String, Int)]
 fromLiterate file lines = 
   let literate = [ (ls, n) |  ('>':ls, n) <- lines ]
-  in if ".lhs" `isSuffixOf` file then literate
+  in if ".lhs" `isSuffixOf` file && (not . null $ literate) then literate -- not . null literate because of Repair.lhs of darcs 
       else if ".hs" `isSuffixOf` file then lines
       else if (null literate || not ( any ( (any ("\\begin" `isPrefixOf`)). words . fst) lines) ) 
         then lines else literate
