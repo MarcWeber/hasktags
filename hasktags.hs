@@ -363,6 +363,14 @@ findFuncTypeDefs found (t@(Token name p): Token "," _ :xs) =
           findFuncTypeDefs (t : found) xs
 findFuncTypeDefs found (t@(Token name p): Token "::" _ :xs) =
           map (\(Token name p) -> FoundThing FTFuncTypeDef name p) (t:found)
+findFuncTypeDefs found (Token "(" _ :xs) =
+          case break myBreakF xs of
+            (inner@((Token _ p):_), _:xs') ->
+              let merged = Token ( ( concat . map (\(Token x _) -> x) ) inner ) p
+              in findFuncTypeDefs found $ merged : xs'
+            _ -> []
+    where myBreakF (Token ")" _) = True
+          myBreakF _ = False          
 findFuncTypeDefs _ _ = []
 fromWhereOn (w:[]) = []
 fromWhereOn (w: xs@((NewLine _):_)) =
