@@ -103,7 +103,7 @@ options = [ Option "c" ["ctags"]
           , Option "b" ["both"]
             (NoArg BothTags) ("generate both CTAGS and ETAGS")
           , Option "a" ["append"]
-            (NoArg BothTags) ("generate both CTAGS and ETAGS")
+            (NoArg Append) ("append to existing CTAGS and/or ETAGS file(s)")
           , Option "" ["ignore-close-implementation"]
             (NoArg IgnoreCloseImpl) ("ignores found implementation if its closer than 7 lines  - so you can jump to definition in one shot")
           , Option "h" ["help"] (NoArg Help) "This help"
