@@ -352,10 +352,12 @@ findstuff ((Token "type" _):(Token name pos):xs) =
         FoundThing FTType name pos : findstuff xs
 findstuff ((Token "class" _):xs) = case break ((== "where").tokenString) xs of
         (_,[]) -> []
-        (t,r) -> case (last . takeWhile ((/= "=>").tokenString) . reverse) t of
+        (t,r) -> case (head . dropWhile isParenOpen . reverse . takeWhile ((/= "=>").tokenString) . reverse) t of
                   (Token name p) -> FoundThing FTClass name p : fromWhereOn r
                   _ -> []
-findstuff xs = findFunc xs ++ findFuncTypeDefs [] xs
+    where isParenOpen (Token "(" _) = True
+          isParenOpen _ = False
+findstuff xs = traceShow xs $ findFunc xs ++ findFuncTypeDefs [] xs
 
 findFuncTypeDefs found (t@(Token name p): Token "," _ :xs) =
           findFuncTypeDefs (t : found) xs
