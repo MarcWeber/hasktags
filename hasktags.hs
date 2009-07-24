@@ -357,7 +357,7 @@ findstuff ((Token "class" _):xs) = case break ((== "where").tokenString) xs of
                   _ -> []
     where isParenOpen (Token "(" _) = True
           isParenOpen _ = False
-findstuff xs = traceShow xs $ findFunc xs ++ findFuncTypeDefs [] xs
+findstuff xs = findFunc xs ++ findFuncTypeDefs [] xs
 
 findFuncTypeDefs found (t@(Token name p): Token "," _ :xs) =
           findFuncTypeDefs (t : found) xs
