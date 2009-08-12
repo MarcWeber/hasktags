@@ -208,13 +208,16 @@ spacedwords xs = (blanks ++ wordchars):(spacedwords rest2)
           (wordchars,rest2) = span (\x -> not $ Char.isSpace x) rest
 
 
+
+-- makes sure file is fully closed after reading (taken from haskell-pandoc)
+readFile' :: FilePath -> IO String
+readFile' f = do s <- readFile f
+                 return $! (length s `seq` s)
+
 -- Find the definitions in a file
 findthings :: Bool -> FileName -> IO FileData
 findthings ignoreCloseImpl filename = do
-        -- forces evaluation of text
-        -- too many files were being opened otherwise since
-        -- readFile is lazy
-        aslines <- fmap ( lines . evaluate) $ readFile filename
+        aslines <- fmap ( lines . evaluate) $ readFile' filename
 
         let stripNonHaskellLines = let
                   emptyLine l = ( all ((all isSpace) . tokenString) )
