@@ -8,19 +8,36 @@ hasktags: a tool to generate tag files for vim and emacs
 
   so that you can find / jump to them fast.
 
-HOWTO:
+HOWTO (GENERATING TAG FILES):
   ghc --make hasktags.hs
 
   I've been using this bash function or something similar for a long time.
   It may be cumbersome but works:
 
   runHaskTagsVim() {
-          hasktags-modified -c --ignore-close-implementation `find -L . -iname "*.hsc"|grep -v _darcs` `find -L . -iname "*.hs"|grep -v _darcs` `find -L . -iname "*.lhs"|grep -v _darcs`
+          # use --etags instead of --ctags for emacs
+          hasktags --ignore-close-implementation --ctags `find . -type f -name \"*.*hs\"`; sort tags
   }
 
-test cases:
-  cd testcases; sh test.sh
+HOWTO (USING TAG FILES):
+  VIM: let tags+=tagifle " tags,TAGS is the default setting so probably you don't have to do anything
+       :tjump foo<tab> or such. See :h tags
+  
+  NEdit:
+	Load the "tags" file using File/Load Tags File.
+	Use "Ctrl-D" to search for a tag.
 
+  XEmacs/Emacs:
+	Load the "TAGS" file using "visit-tags-table"
+	Use "M-." to search for a tag.
+
+  jedit:
+        There is a plugin
+	
+
+
+run test cases:
+  cd testcases; sh test.sh
 
 
 history:
