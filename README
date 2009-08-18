@@ -1,0 +1,29 @@
+hasktags: a tool to generate tag files for vim and emacs
+
+  What is it for? A tag file is a index containing key items of your project such as
+  - function names
+  - module names
+  - data declarations
+  - ...
+
+  so that you can find / jump to them fast.
+
+HOWTO:
+  ghc --make hasktags.hs
+
+  I've been using this bash function or something similar for a long time.
+  It may be cumbersome but works:
+
+  runHaskTagsVim() {
+          hasktags-modified -c --ignore-close-implementation `find -L . -iname "*.hsc"|grep -v _darcs` `find -L . -iname "*.hs"|grep -v _darcs` `find -L . -iname "*.lhs"|grep -v _darcs`
+  }
+
+test cases:
+  cd testcases; sh test.sh
+
+
+
+history:
+In the past this tool was distributed with ghc. I forked and added some
+features.  hasktags itself was moved out of the ghc repository. Then I only
+verified that my fork finds at least as much tags as the one forked by Igloo.
