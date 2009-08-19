@@ -1,0 +1,13 @@
+
+    -    From: Evan Laforge <qdunkan@gmail.com>
+         To: Marc Weber <marco-oweber@gmx.de>
+         Date: August 18 2009 10:50pm (11 hours ago)
+         Subject: Re: hasktags - If nobody minds I'll maintain it..
+         Labels: inbox, libraries_haskell, sent
+         In reply to: Marc Weber's message of August 18 2009  1:40pm
+    Thanks for taking this up, tags are very useful.  I have two
+    suggestions: why not write the file sorted by default?  Also, if you
+    put '!_TAG_FILE_SORTED\t1\t ~' on the first line, vim will assume it's
+    sorted and not fall back on the slow linear search when it doesn't
+    find a tag.
+
