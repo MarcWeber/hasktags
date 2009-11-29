@@ -1,0 +1,24 @@
+Name: hasktags
+Version: 0.68
+Copyright: The University Court of the University of Glasgow
+License: BSD3
+License-File: LICENSE
+Author: The GHC Team
+Maintainer: Marc Weber <marco-oweber@gmx.de>
+Synopsis: Produces ctags "tags" and etags "TAGS" files for Haskell programs
+Description:
+	Produces ctags "tags" and etags "TAGS" files for Haskell programs.
+Category: Development
+build-type: Simple
+cabal-version: >=1.2
+extra-source-files: README
+
+-- Later, this isn't compatible with Cabal 1.2:
+-- source-repository head
+--   type:     darcs
+--   location: http://code.haskell.org/hasktags/
+
+Executable hasktags
+    Main-Is: hasktags.hs
+    Build-Depends: haskell98, base
+
