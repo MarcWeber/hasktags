@@ -275,6 +275,7 @@ findthings ignoreCloseImpl filename = do
 	-- difference abc::def is recognized as three words
         -- `abc` is recognized as "`" "abc" "`"
 	mywords :: String -> [String]
+	mywords ('{':xs) = "{" : mywords xs
 	mywords ('(':xs) = "(" : mywords xs
 	mywords ('`':xs) = "`" : mywords xs
 	mywords ('=':'>':xs) = "=>" : mywords xs

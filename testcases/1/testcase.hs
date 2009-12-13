@@ -76,3 +76,7 @@ module A.B.testcase(module System.FilePath.Windows) where
 -- to be found assertEqual
     assertEqual :: (Eq a, Show a) => String -> a -> a -> Assertion
     assertEqual preface expected actual =
+
+-- to be found CheckedException 
+-- to be found checkedException
+    newtype CheckedException l = CheckedException {checkedException::SomeException} deriving (Typeable)
