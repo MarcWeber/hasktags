@@ -1,6 +1,7 @@
 module Main (main) where
 import Char
 import Data.List
+import Data.Maybe
 import IO
 import System.Environment
 import System.Console.GetOpt
@@ -355,12 +356,13 @@ findstuff ((Token "newtype" _):ts@((t@(Token name pos)):_)) =
 findstuff ((Token "type" _):(Token name pos):xs) =
         FoundThing FTType name pos : findstuff xs
 findstuff ((Token "class" _):xs) = case break ((== "where").tokenString) xs of
-        (_,[]) -> []
-        (t,r) -> case (head . dropWhile isParenOpen . reverse . takeWhile ((/= "=>").tokenString) . reverse) t of
-                  (Token name p) -> FoundThing FTClass name p : fromWhereOn r
-                  _ -> []
+        (xs,[]) -> maybeToList $ className xs
+        (t,r) -> maybe [] (:fromWhereOn r) $ className xs
     where isParenOpen (Token "(" _) = True
           isParenOpen _ = False
+          className xs = case (head . dropWhile isParenOpen . reverse . takeWhile ((/= "=>").tokenString) . reverse) xs of
+            (Token name p) -> Just $ FoundThing FTClass name p
+            _ -> Nothing
 findstuff xs = findFunc xs ++ findFuncTypeDefs [] xs
 
 findFuncTypeDefs found (t@(Token name p): Token "," _ :xs) =

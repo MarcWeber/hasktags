@@ -80,3 +80,7 @@ module A.B.testcase(module System.FilePath.Windows) where
 -- to be found CheckedException 
 -- to be found checkedException
     newtype CheckedException l = CheckedException {checkedException::SomeException} deriving (Typeable)
+
+
+-- to be found Throws
+    class Exception e => Throws e l
