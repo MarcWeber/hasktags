@@ -1,12 +1,15 @@
 module Main (main) where
-import Char
+
+import Data.Char
 import Data.List
 import Data.Maybe
+import Control.Monad( when )
+
 import IO
 import System.Environment
 import System.Console.GetOpt
 import System.Exit
-import Debug.Trace
+--import Debug.Trace
 
 
 -- search for definitions of things
@@ -60,29 +63,37 @@ main = do
         args <- getArgs
         let usageString = "Usage: " ++ progName ++ " [OPTION...] [files...]"
         let (modes, filenames, errs) = getOpt Permute options args
-        if errs /= [] || elem Help modes || filenames == []
-         then do
-           putStr $ unlines errs
-           putStr $ usageInfo usageString options
-           exitWith (ExitFailure 1)
-         else return ()
+
+        when (errs /= [] || elem Help modes || filenames == [])
+             (do putStr $ unlines errs
+                 putStr $ usageInfo usageString options
+                 exitWith (ExitFailure 1))
+
         let mode = getMode (filter ( `elem` [BothTags, CTags, ETags, Append] ) modes)
-        let openFileMode = if elem Append modes
+            openFileMode = if elem Append modes
                            then AppendMode
                            else WriteMode
         filedata <- mapM (findthings (IgnoreCloseImpl `elem` modes)) filenames
-        if mode == BothTags || mode == CTags
-         then do
-           ctagsfile <- openFile "tags" openFileMode
-           writectagsfile ctagsfile filedata
-           hClose ctagsfile
-         else return ()
-        if mode == BothTags || mode == ETags
-         then do
-           etagsfile <- openFile "TAGS" openFileMode
-           writeetagsfile etagsfile filedata
-           hClose etagsfile
-         else return ()
+
+        when (mode == CTags)
+             (do ctagsfile <- getOutFile "tags" openFileMode modes
+                 writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
+                 hClose ctagsfile)
+
+        when (mode == ETags)
+             (do etagsfile <- openFile "TAGS" openFileMode
+                 writeetagsfile etagsfile filedata
+                 hClose etagsfile)
+
+        -- avoid problem when both is used in combination
+        -- with redirection on stdout
+        when (mode == BothTags)
+             (do etagsfile <- getOutFile "TAGS" openFileMode modes
+                 writeetagsfile etagsfile filedata
+                 ctagsfile <- getOutFile "tags" openFileMode modes
+                 writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
+                 hClose etagsfile
+                 hClose ctagsfile)
 
 -- | getMode takes a list of modes and extract the mode with the
 --   highest precedence.  These are as follows: Both, CTags, ETags
@@ -91,10 +102,24 @@ getMode :: [Mode] -> Mode
 getMode [] = BothTags
 getMode xs = maximum xs
 
+-- | getOutFile scan the modes searching for output redirection
+--   if not found, open the file with name passed as parameter.
+--   Handle special file -, which is stdout
+getOutFile :: String -> IOMode -> [Mode] -> IO Handle
+getOutFile _           _        ((OutRedir "-"):_) = return stdout
+getOutFile _           openMode ((OutRedir f):_)   = openFile f openMode
+getOutFile name        openMode (_:xs)             = getOutFile name openMode xs
+getOutFile defaultName openMode []                 = openFile defaultName openMode
 
-data Mode = ETags | CTags | BothTags | Append 
-            | IgnoreCloseImpl
-            | Help deriving (Ord, Eq, Show)
+data Mode = ExtendedCtag
+		  | IgnoreCloseImpl
+          | ETags 
+          | CTags 
+          | BothTags 
+          | Append 
+          | OutRedir String
+          | Help
+          deriving (Ord, Eq, Show)
 
 options :: [OptDescr Mode]
 options = [ Option "c" ["ctags"]
@@ -102,11 +127,17 @@ options = [ Option "c" ["ctags"]
           , Option "e" ["etags"]
             (NoArg ETags) "generate ETAGS file (etags)"
           , Option "b" ["both"]
-            (NoArg BothTags) ("generate both CTAGS and ETAGS")
+            (NoArg BothTags) "generate both CTAGS and ETAGS"
           , Option "a" ["append"]
-            (NoArg Append) ("append to existing CTAGS and/or ETAGS file(s)")
+            (NoArg Append) "append to existing CTAGS and/or ETAGS file(s)"
           , Option "" ["ignore-close-implementation"]
-            (NoArg IgnoreCloseImpl) ("ignores found implementation if its closer than 7 lines  - so you can jump to definition in one shot")
+            (NoArg IgnoreCloseImpl) "ignores found implementation if its closer than 7 lines  - so you can jump to definition in one shot"
+          , Option "o" ["output"]
+            (ReqArg OutRedir "") "output to given file, instead of 'tags', '-' file is stdout"
+          , Option "f" ["file"]
+            (ReqArg OutRedir "") "same as -o, but used as compatibility with ctags"
+          , Option "x" ["extendedctag"]
+            (NoArg ExtendedCtag) "Generate additional information in ctag file."
           , Option "h" ["help"] (NoArg Help) "This help"
           ]
 
@@ -132,12 +163,12 @@ instance Show FoundThingType where
   show FTFuncImpl = "fi"
   show FTType = "t"
   show FTData = "d"
-  show FTDataGADT = "d-gadt"
+  show FTDataGADT = "d_gadt"
   show FTNewtype = "nt"
   show FTClass = "c"
   show FTModule = "m"
   show FTCons = "cons"
-  show FTConsGADT = "c-gadt"
+  show FTConsGADT = "c_gadt"
   show FTConsAccessor = "c_a"
   show FTOther = "o"
 
@@ -152,51 +183,70 @@ data Token = Token String Pos
   deriving (Eq)
 instance Show Token where
   -- show (Token t (Pos _ l _ _) ) = "Token " ++ t ++ " " ++ (show l)
-  show (Token t (Pos _ l _ _) ) = " " ++ t ++ " "
-  show (NewLine i) = "NewLine " ++ (show i)
+  show (Token t (Pos _ _l _ _) ) = " " ++ t ++ " "
+  show (NewLine i) = "NewLine " ++ show i
 
+tokenString :: Token -> String
 tokenString (Token s _) = s
 tokenString (NewLine _) = "\n"
+
+isNewLine :: Maybe Int -> Token -> Bool
 isNewLine Nothing (NewLine _) = True
 isNewLine (Just c) (NewLine c') = c == c'
 isNewLine _ _ = False
 
+trimNewlines :: [Token] -> [Token]
 trimNewlines = filter (not . isNewLine Nothing)
 
 
 -- stuff for dealing with ctags output format
 
-writectagsfile :: Handle -> [FileData] -> IO ()
-writectagsfile ctagsfile filedata = do
-    let things = concat $ map getfoundthings filedata
-    mapM_ (\x -> hPutStrLn ctagsfile $ dumpthing x) (sortThings things)
+writectagsfile :: Handle -> Bool -> [FileData] -> IO ()
+writectagsfile ctagsfile extended filedata = do
+    let things = concatMap getfoundthings filedata
+    when extended
+         (do hPutStrLn ctagsfile "!_TAG_FILE_FORMAT\t2\t/extended format; --format=1 will not append ;\" to lines/"
+             hPutStrLn ctagsfile "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted, 2=foldcase/"
+             hPutStrLn ctagsfile "!_TAG_PROGRAM_NAME\thasktags")
+    mapM_ (hPutStrLn ctagsfile . dumpthing extended) (sortThings things)
 
+sortThings :: [FoundThing] -> [FoundThing]
 sortThings = sortBy (\(FoundThing _ a _) (FoundThing _ b _) -> compare a b)
 
 getfoundthings :: FileData -> [FoundThing]
 getfoundthings (FileData _ things) = things
 
-dumpthing :: FoundThing -> String
-dumpthing (FoundThing ftt name (Pos filename line _ _)) =
-        name ++ "\t" ++ filename ++ "\t" ++ (show $ line + 1) ++ ";\"" ++ "\t" ++ (show ftt) -- Using backward compatible tag kind extension here
+-- | Dump found tag in normal or extended (read : vim like) ctag
+-- line
+dumpthing :: Bool -> FoundThing -> String
+dumpthing False (FoundThing _ name (Pos filename line _ _)) =
+    name ++ "\t" ++ filename ++ "\t" ++ show (line + 1)
+dumpthing True (FoundThing kind name (Pos filename line _ lineText)) =
+    name ++ "\t" ++ filename
+         ++ "\t/^" ++ concatMap ctagEncode lineText
+         ++ "$/;\"\t" ++ show kind
+         ++ "\tline:" ++ show (line + 1)
 
+ctagEncode :: Char -> String
+ctagEncode '/' = "\\/"
+ctagEncode '\\' = "\\\\"
+ctagEncode a = [a]
 
 -- stuff for dealing with etags output format
 
 writeetagsfile :: Handle -> [FileData] -> IO ()
-writeetagsfile etagsfile filedata = do
-    mapM_ (\x -> hPutStr etagsfile $ e_dumpfiledata x) filedata
+writeetagsfile etagsfile = mapM_ (hPutStr etagsfile . etagsDumpFileData)
 
-e_dumpfiledata :: FileData -> String
-e_dumpfiledata (FileData filename things) =
-    "\x0c\n" ++ filename ++ "," ++ (show thingslength) ++ "\n" ++ thingsdump
-    where thingsdump = concat $ map e_dumpthing things
+etagsDumpFileData :: FileData -> String
+etagsDumpFileData (FileData filename things) =
+    "\x0c\n" ++ filename ++ "," ++ show thingslength ++ "\n" ++ thingsdump
+    where thingsdump = concatMap etagsDumpThing things
           thingslength = length thingsdump
 
-e_dumpthing :: FoundThing -> String
-e_dumpthing (FoundThing _ name (Pos filename line token fullline)) =
-        (concat $ take (token + 1) $ spacedwords fullline)
-        ++ "\x7f" ++ (show line) ++ "," ++ (show $ line+1) ++ "\n"
+etagsDumpThing :: FoundThing -> String
+etagsDumpThing (FoundThing _ _name (Pos _filename line token fullline)) =
+        concat (take (token + 1) $ spacedwords fullline)
+        ++ "\x7f" ++ show line ++ "," ++ show (line + 1) ++ "\n"
 
 
 -- like "words", but keeping the whitespace, and so letting us build
@@ -204,11 +254,9 @@ e_dumpthing (FoundThing _ name (Pos filename line token fullline)) =
 
 spacedwords :: String -> [String]
 spacedwords [] = []
-spacedwords xs = (blanks ++ wordchars):(spacedwords rest2)
-    where (blanks,rest) = span Char.isSpace xs
-          (wordchars,rest2) = span (\x -> not $ Char.isSpace x) rest
-
-
+spacedwords xs = (blanks ++ wordchars) : spacedwords rest2
+    where (blanks,rest) = span isSpace xs
+          (wordchars,rest2) = break isSpace rest
 
 -- makes sure file is fully closed after reading (taken from haskell-pandoc)
 readFile' :: FilePath -> IO String
@@ -221,25 +269,25 @@ findthings ignoreCloseImpl filename = do
         aslines <- fmap ( lines . evaluate) $ readFile' filename
 
         let stripNonHaskellLines = let
-                  emptyLine l = ( all ((all isSpace) . tokenString) )
-                                $ filter (not . (isNewLine Nothing)) l
-                  cppLine (nl:t:_) = ("#" `isPrefixOf`) $ tokenString t
+                  emptyLine = all (all isSpace . tokenString)
+                            . filter (not . isNewLine Nothing)
+                  cppLine (_nl:t:_) = ("#" `isPrefixOf`) $ tokenString t
                   cppLine _ = False
                 in filter (not . emptyLine) . filter (not . cppLine)
 
         --  remove -- comments, then break each line into tokens (adding line numbers)
         --  then remove {- -} comments
         --  split by lines again ( to get indent
-        let (lines , numbers) = unzip . fromLiterate filename $ zip aslines [0..]
+        let (fileLines, numbers) = unzip . fromLiterate filename $ zip aslines [0..]
         let tokenLines =
                       stripNonHaskellLines
                       $ stripslcomments
-                      $ (splitByNL Nothing)
+                      $ splitByNL Nothing
                       $ stripblockcomments
                       $ concat
                       $ zipWith3 (withline filename)
-                                 (map ( filter (not . (all isSpace)). mywords) $ lines)
-                                 lines
+                                 (map ( filter (not . all isSpace) . mywords) fileLines)
+                                 fileLines
                                  numbers
 
 
@@ -253,7 +301,7 @@ findthings ignoreCloseImpl filename = do
         let sections = map tail -- strip leading NL (no longer needed 
                        $ filter (not . null)
                        $ splitByNL (Just (getTopLevelIndent tokenLines) )
-                       $ concat $ tokenLines
+                       $ concat tokenLines
         -- only take one of
         -- a 'x' = 7
         -- a _ = 0
@@ -262,8 +310,8 @@ findthings ignoreCloseImpl filename = do
                                              -> f1 == f2 && n1 == n2 && t1 == FTFuncImpl && t2 == FTFuncImpl )
 
         let iCI = if ignoreCloseImpl 
-              then nubBy (\(FoundThing t1 n1 (Pos f1 l1 _ _)) 
-                         (FoundThing t2 n2 (Pos f2 l2 _ _))
+              then nubBy (\(FoundThing _ n1 (Pos f1 l1 _ _)) 
+                         (FoundThing _ n2 (Pos f2 l2 _ _))
                          -> f1 == f2 && n1 == n2  && ( ( <= 7 ) $ abs $ l2 - l1))
               else id
         return $ FileData filename $ iCI $ filterAdjacentFuncImpl $ concatMap findstuff sections
@@ -303,12 +351,12 @@ findthings ignoreCloseImpl filename = do
 -- and which token they are through that line
 
 withline :: FileName -> [String] -> String -> Int -> [Token]
-withline filename words fullline i =
+withline filename sourceWords fullline i =
   let countSpaces (' ':xs) = 1 + countSpaces xs
       countSpaces ('\t':xs) = 8 + countSpaces xs
       countSpaces _ = 0
   in NewLine (countSpaces fullline)
-      : zipWith (\w t -> Token w (Pos filename i t fullline)) words [1 ..]
+      : zipWith (\w t -> Token w (Pos filename i t fullline)) sourceWords [1 ..]
 
 -- comments stripping
 
@@ -338,66 +386,77 @@ afterblockcomend [] = []
 -- does one string contain another string
 
 contains :: Eq a => [a] -> [a] -> Bool
-contains sub full = any (isPrefixOf sub) $ tails full
+contains sub = any (isPrefixOf sub) . tails
 
 -- actually pick up definitions
 
 findstuff :: [Token] -> [FoundThing]
-findstuff ((Token "module" _):(Token name pos):xs) =
-        FoundThing FTModule name pos : [] -- nothing will follow this section
+findstuff ((Token "module" _):(Token name pos):_) =
+        [FoundThing FTModule name pos] -- nothing will follow this section
 findstuff ((Token "data" _):(Token name pos):xs)
         | any ( (== "where"). tokenString ) xs -- GADT 
             -- TODO will be found as FTCons (not FTConsGADT), the same for functions - but they are found :) 
-            = FoundThing FTDataGADT name pos : (getcons2 xs) ++ (fromWhereOn xs) -- ++ (findstuff xs)
-        | otherwise = FoundThing FTData name pos : (getcons FTData (trimNewlines xs))-- ++ (findstuff xs)
-findstuff ((Token "newtype" _):ts@((t@(Token name pos)):_)) =
-        FoundThing FTNewtype name pos : (getcons FTCons (trimNewlines ts))-- ++ (findstuff xs)
+            = FoundThing FTDataGADT name pos : getcons2 xs ++ fromWhereOn xs -- ++ (findstuff xs)
+        | otherwise = FoundThing FTData name pos : getcons FTData (trimNewlines xs)-- ++ (findstuff xs)
+findstuff ((Token "newtype" _):ts@(((Token name pos)):_)) =
+        FoundThing FTNewtype name pos : getcons FTCons (trimNewlines ts)-- ++ (findstuff xs)
         -- FoundThing FTNewtype name pos : findstuff xs
 findstuff ((Token "type" _):(Token name pos):xs) =
         FoundThing FTType name pos : findstuff xs
 findstuff ((Token "class" _):xs) = case break ((== "where").tokenString) xs of
-        (xs,[]) -> maybeToList $ className xs
-        (t,r) -> maybe [] (:fromWhereOn r) $ className xs
+        (ys,[]) -> maybeToList $ className ys
+        (_,r) -> maybe [] (:fromWhereOn r) $ className xs
     where isParenOpen (Token "(" _) = True
           isParenOpen _ = False
-          className xs = case (head . dropWhile isParenOpen . reverse . takeWhile ((/= "=>").tokenString) . reverse) xs of
+          className lst = case (head . dropWhile isParenOpen . reverse . takeWhile ((/= "=>").tokenString) . reverse) lst of
             (Token name p) -> Just $ FoundThing FTClass name p
             _ -> Nothing
 findstuff xs = findFunc xs ++ findFuncTypeDefs [] xs
 
-findFuncTypeDefs found (t@(Token name p): Token "," _ :xs) =
+findFuncTypeDefs :: [Token] -> [Token] -> [FoundThing]
+findFuncTypeDefs found (t@(Token _ _): Token "," _ :xs) =
           findFuncTypeDefs (t : found) xs
-findFuncTypeDefs found (t@(Token name p): Token "::" _ :xs) =
+findFuncTypeDefs found (t@(Token _ _): Token "::" _ :_) =
           map (\(Token name p) -> FoundThing FTFuncTypeDef name p) (t:found)
 findFuncTypeDefs found (Token "(" _ :xs) =
           case break myBreakF xs of
             (inner@((Token _ p):_), _:xs') ->
-              let merged = Token ( ( concat . map (\(Token x _) -> x) ) inner ) p
+              let merged = Token ( concatMap (\(Token x _) -> x) inner ) p
               in findFuncTypeDefs found $ merged : xs'
             _ -> []
     where myBreakF (Token ")" _) = True
           myBreakF _ = False          
 findFuncTypeDefs _ _ = []
-fromWhereOn (w:[]) = []
-fromWhereOn (w: xs@((NewLine _):_)) =
+
+fromWhereOn :: [Token] -> [FoundThing]
+fromWhereOn [] = []
+fromWhereOn [_] = []
+fromWhereOn (_: xs@((NewLine _):_)) =
              concatMap (findstuff . tail')
              $ splitByNL (Just ( minimum
                                 . (10000:)
                                 . map (\(NewLine i) -> i)
                                 . filter (isNewLine Nothing) $ xs)) xs
-fromWhereOn (w:xw) = findstuff xw
+fromWhereOn (_:xw) = findstuff xw
 
+findFunc :: [Token] -> [FoundThing]
 findFunc x = case findInfix x of
-    x:xs -> x:xs
+    a@(_:_) -> a
     _ -> findF x
+
+findInfix :: [Token] -> [FoundThing]
 findInfix x = case dropWhile ((/= "`"). tokenString) (takeWhile ( (/= "=") . tokenString) x) of
-          x:(Token name p):_ -> FoundThing FTFuncImpl name p : []
+          _:(Token name p):_ -> [FoundThing FTFuncImpl name p]
           _ -> []
-findF ((Token name p):xs) = if (any (("=" ==).tokenString) xs)
-            then FoundThing FTFuncImpl name p : [] else []
+
+
+findF :: [Token] -> [FoundThing]
+findF ((Token name p):xs) =
+    [FoundThing FTFuncImpl name p | any (("=" ==) . tokenString) xs]
 findF _ = []
 
-tail' (x:xs) = xs
+tail' :: [a] -> [a]
+tail' (_:xs) = xs
 tail' [] = []
 
 -- get the constructor definitions, knowing that a datatype has just started
@@ -405,16 +464,17 @@ tail' [] = []
 getcons :: FoundThingType -> [Token] -> [FoundThing]
 getcons ftt ((Token "=" _):(Token name pos):xs) =
         FoundThing ftt name pos : getcons2 xs
-getcons ftt (x:xs) = getcons ftt xs
+getcons ftt (_:xs) = getcons ftt xs
 getcons _ [] = []
 
 
+getcons2 :: [Token] -> [FoundThing]
 getcons2 ((Token name pos):(Token "::" _):xs) =
         FoundThing FTConsAccessor name pos : getcons2 xs
-getcons2 ((Token "=" _):xs) = []
+getcons2 ((Token "=" _):_) = []
 getcons2 ((Token "|" _):(Token name pos):xs) =
         FoundThing FTCons name pos : getcons2 xs
-getcons2 (x:xs) = getcons2 xs
+getcons2 (_:xs) = getcons2 xs
 getcons2 [] = []
 
 
@@ -424,9 +484,10 @@ splitByNL maybeIndent (nl@(NewLine _):ts) =
   in (nl : a) : splitByNL maybeIndent b
 splitByNL _ _ = []
 
+getTopLevelIndent :: [[Token]] -> Int
 getTopLevelIndent [] = 0 -- (no import found , assuming indent 0 : this can be
                          -- done better but should suffice for most needs
-getTopLevelIndent (x:xs) = if (any ((=="import") . tokenString) x)
+getTopLevelIndent (x:xs) = if any ((=="import") . tokenString) x
                           then let ((NewLine i):_) = x in i
                           else getTopLevelIndent xs
 
@@ -435,9 +496,10 @@ fromLiterate :: FilePath -> [(String, Int)] -> [(String, Int)]
 fromLiterate file lines = 
   let literate = [ (ls, n) |  ('>':ls, n) <- lines ]
   in if ".lhs" `isSuffixOf` file && (not . null $ literate) then literate -- not . null literate because of Repair.lhs of darcs 
-      else if ".hs" `isSuffixOf` file then lines
-      else if (null literate || not ( any ( (any ("\\begin" `isPrefixOf`)). words . fst) lines) ) 
-        then lines else literate
+      else if (".hs" `isSuffixOf` file)
+            || (null literate || not ( any ( any ("\\begin" `isPrefixOf`). words . fst) lines))
+        then lines
+        else literate
 
 {- testcase:
 
