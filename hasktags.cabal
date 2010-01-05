@@ -20,5 +20,5 @@ extra-source-files: README
 
 Executable hasktags
     Main-Is: hasktags.hs
-    Build-Depends: haskell98, base <= 4.2
+    Build-Depends: haskell98, base < 5
 
