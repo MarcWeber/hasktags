@@ -1,5 +1,5 @@
 module Main (main) where
-
+import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.List
 import Data.Maybe
@@ -258,15 +258,10 @@ spacedwords xs = (blanks ++ wordchars) : spacedwords rest2
     where (blanks,rest) = span isSpace xs
           (wordchars,rest2) = break isSpace rest
 
--- makes sure file is fully closed after reading (taken from haskell-pandoc)
-readFile' :: FilePath -> IO String
-readFile' f = do s <- readFile f
-                 return $! (length s `seq` s)
-
 -- Find the definitions in a file
 findthings :: Bool -> FileName -> IO FileData
 findthings ignoreCloseImpl filename = do
-        aslines <- fmap ( lines . evaluate) $ readFile' filename
+        aslines <- fmap ( lines . evaluate . BS.unpack) $ BS.readFile filename
 
         let stripNonHaskellLines = let
                   emptyLine = all (all isSpace . tokenString)
