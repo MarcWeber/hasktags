@@ -7,8 +7,11 @@ import Control.Monad( when )
 
 import IO
 import System.Environment
+import System.Directory (doesDirectoryExist, getDirectoryContents)
+import System.FilePath ((</>))
 import System.Console.GetOpt
 import System.Exit
+import Control.Monad
 --import Debug.Trace
 
 
@@ -61,8 +64,13 @@ main :: IO ()
 main = do
         progName <- getProgName
         args <- getArgs
-        let usageString = "Usage: " ++ progName ++ " [OPTION...] [files...]"
-        let (modes, filenames, errs) = getOpt Permute options args
+        let usageString = 
+                   "Usage: " ++ progName ++ " [OPTION...] [files or directories...]\n"
+                ++ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs\n"
+                ++ "Thus hasktags . tags all important files in the current directory"
+        let (modes, files_or_dirs, errs) = getOpt Permute options args
+
+        filenames <- liftM (nub . concat) $ mapM (dirToFiles False) files_or_dirs
 
         when (errs /= [] || elem Help modes || filenames == [])
              (do putStr $ unlines errs
@@ -94,6 +102,19 @@ main = do
                  writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
                  hClose etagsfile
                  hClose ctagsfile)
+
+dirToFiles :: Bool -> FilePath -> IO [ FilePath ]
+dirToFiles hsExtOnly p = do
+  isD <- doesDirectoryExist p
+  if isD then recurse p
+         else return $ if not hsExtOnly || ".hs" `isSuffixOf` p || ".lhs" `isSuffixOf` p then [p] else []
+  where recurse p = do
+            names <- liftM (filter (\x -> x /= "." && x /= "..") ) $ getDirectoryContents p
+            liftM concat $ mapM (processFile . (p </>) ) names
+        processFile "." = return []
+        processFile ".." = return []
+        processFile f = dirToFiles True f
+
 
 -- | getMode takes a list of modes and extract the mode with the
 --   highest precedence.  These are as follows: Both, CTags, ETags
@@ -129,7 +150,7 @@ options = [ Option "c" ["ctags"]
           , Option "b" ["both"]
             (NoArg BothTags) "generate both CTAGS and ETAGS"
           , Option "a" ["append"]
-            (NoArg Append) "append to existing CTAGS and/or ETAGS file(s)"
+            (NoArg Append) "append to existing CTAGS and/or ETAGS file(s). After this file will no longer be sorted!"
           , Option "" ["ignore-close-implementation"]
             (NoArg IgnoreCloseImpl) "ignores found implementation if its closer than 7 lines  - so you can jump to definition in one shot"
           , Option "o" ["output"]
@@ -211,7 +232,12 @@ writectagsfile ctagsfile extended filedata = do
     mapM_ (hPutStrLn ctagsfile . dumpthing extended) (sortThings things)
 
 sortThings :: [FoundThing] -> [FoundThing]
-sortThings = sortBy (\(FoundThing _ a _) (FoundThing _ b _) -> compare a b)
+sortThings = sortBy comp
+  where 
+        comp (FoundThing _ a (Pos f1 l1 _ _)) (FoundThing _ b (Pos f2 l2 _ _)) =
+            c (c (compare a b) $ (compare f1 f2)) (compare l1 l2)
+        c a b = if a == EQ then b else a
+
 
 getfoundthings :: FileData -> [FoundThing]
 getfoundthings (FileData _ things) = things

@@ -20,4 +20,4 @@ extra-source-files: README
 
 Executable hasktags
     Main-Is: hasktags.hs
-    Build-Depends: haskell98, base < 5, bytestring
+    Build-Depends: haskell98, base < 5, bytestring, directory, filepath

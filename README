@@ -16,7 +16,7 @@ HOWTO (GENERATING TAG FILES):
 
   runHaskTagsVim() {
           # use --etags instead of --ctags for emacs
-          hasktags --ignore-close-implementation --ctags `find . -type f -name \"*.*hs\"`; sort tags
+          hasktags --ignore-close-implementation --ctags .; sort tags
   }
 
 HOWTO (USING TAG FILES):
