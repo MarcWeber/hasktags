@@ -72,10 +72,13 @@ main = do
 
         filenames <- liftM (nub . concat) $ mapM (dirToFiles False) files_or_dirs
 
-        when (errs /= [] || elem Help modes || filenames == [])
+        when (errs /= [] || elem Help modes || files_or_dirs == [])
              (do putStr $ unlines errs
                  putStr $ usageInfo usageString options
                  exitWith (ExitFailure 1))
+
+        when (filenames == []) $ do
+          putStrLn "warning: no files found!"
 
         let mode = getMode (filter ( `elem` [BothTags, CTags, ETags, Append] ) modes)
             openFileMode = if elem Append modes
@@ -109,10 +112,9 @@ dirToFiles hsExtOnly p = do
   if isD then recurse p
          else return $ if not hsExtOnly || ".hs" `isSuffixOf` p || ".lhs" `isSuffixOf` p then [p] else []
   where recurse p = do
-            names <- liftM (filter (\x -> x /= "." && x /= "..") ) $ getDirectoryContents p
+            names <- liftM (filter ( (/= '.') . head ) ) $ getDirectoryContents p
+                                      -- skip . .. and hidden files (linux)  
             liftM concat $ mapM (processFile . (p </>) ) names
-        processFile "." = return []
-        processFile ".." = return []
         processFile f = dirToFiles True f
 
 
