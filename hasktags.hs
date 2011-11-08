@@ -80,7 +80,7 @@ main = do
         when (filenames == []) $ do
           putStrLn "warning: no files found!"
 
-        let mode = getMode (filter ( `elem` [BothTags, CTags, ETags, Append] ) modes)
+        let mode = getMode (filter ( `elem` [BothTags, CTags, ETags] ) modes)
             openFileMode = if elem Append modes
                            then AppendMode
                            else WriteMode
@@ -92,7 +92,7 @@ main = do
                  hClose ctagsfile)
 
         when (mode == ETags)
-             (do etagsfile <- openFile "TAGS" openFileMode
+             (do etagsfile <- getOutFile "TAGS" openFileMode modes
                  writeetagsfile etagsfile filedata
                  hClose etagsfile)
 
