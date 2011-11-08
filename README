@@ -44,3 +44,12 @@ history:
 In the past this tool was distributed with ghc. I forked and added some
 features.  hasktags itself was moved out of the ghc repository. Then I only
 verified that my fork finds at least as much tags as the one forked by Igloo.
+
+
+related work (list taken from announce of lushtags:
+  https://github.com/bitc/lushtags
+  http://hackage.haskell.org/package/hasktags
+  http://kingfisher.nfshost.com/sw/gasbag/
+  http://hackage.haskell.org/package/hothasktags
+  http://majutsushi.github.com/tagbar/
+and probably much more
