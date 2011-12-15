@@ -5,7 +5,7 @@ import Data.List
 import Data.Maybe
 import Control.Monad( when )
 
-import IO
+import System.IO
 import System.Environment
 import System.Directory (doesDirectoryExist, getDirectoryContents)
 import System.FilePath ((</>))
