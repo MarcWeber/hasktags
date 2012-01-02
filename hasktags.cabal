@@ -1,5 +1,5 @@
 Name: hasktags
-Version: 0.68.1
+Version: 0.68.2
 Copyright: The University Court of the University of Glasgow
 License: BSD3
 License-File: LICENSE
@@ -20,4 +20,5 @@ extra-source-files: README
 
 Executable hasktags
     Main-Is: hasktags.hs
-    Build-Depends: base, bytestring, directory, filepath
+    -- < 6 because hasktags does not use special functions thus its unlikely to break
+    Build-Depends: base < 6, bytestring, directory, filepath
