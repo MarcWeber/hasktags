@@ -309,7 +309,7 @@ findWithCache cache ignoreCloseImpl filename = do
 -- Find the definitions in a file
 findthings :: Bool -> FileName -> IO FileData
 findthings ignoreCloseImpl filename = do
-        aslines <- fmap ( lines . evaluate . BS.unpack) $ BS.readFile filename
+        aslines <- fmap (lines . BS.unpack) $ BS.readFile filename
 
         let stripNonHaskellLines = let
                   emptyLine = all (all isSpace . tokenString)

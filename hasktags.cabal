@@ -4,7 +4,9 @@ Copyright: The University Court of the University of Glasgow
 License: BSD3
 License-File: LICENSE
 Author: The GHC Team
-Maintainer: Marc Weber <marco-oweber@gmx.de>
+Maintainer:
+ Marc Weber <marco-oweber@gmx.de>,
+ Marco Túlio Pimenta Gontijo <marcotmarcot@gmail.com>
 homepage: http://github.com/marcotmarcot/hasktags
 bug-reports: http://github.com/marcotmarcot/hasktags/issues
 Synopsis: Produces ctags "tags" and etags "TAGS" files for Haskell programs
