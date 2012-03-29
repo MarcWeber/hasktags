@@ -21,4 +21,4 @@ extra-source-files: README
 Executable hasktags
     Main-Is: hasktags.hs
     -- < 6 because hasktags does not use special functions thus its unlikely to break
-    Build-Depends: base < 6, bytestring, directory, filepath
+    Build-Depends: base < 6, bytestring, directory, filepath, json

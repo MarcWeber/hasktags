@@ -1,16 +1,19 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Main (main) where
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.List
 import Data.Maybe
+import Data.Data
 import Control.Monad( when )
 
 import System.IO
 import System.Environment
-import System.Directory (doesDirectoryExist, getDirectoryContents)
+import System.Directory
 import System.FilePath ((</>))
 import System.Console.GetOpt
 import System.Exit
+import Text.JSON.Generic
 import Control.Monad
 --import Debug.Trace
 
@@ -84,7 +87,9 @@ main = do
             openFileMode = if elem Append modes
                            then AppendMode
                            else WriteMode
-        filedata <- mapM (findthings (IgnoreCloseImpl `elem` modes)) filenames
+        filedata <- mapM (findWithCache (elem CacheFiles modes)
+                                        (IgnoreCloseImpl `elem` modes))
+                         filenames
 
         when (mode == CTags)
              (do ctagsfile <- getOutFile "tags" openFileMode modes
@@ -141,6 +146,7 @@ data Mode = ExtendedCtag
           | BothTags 
           | Append 
           | OutRedir String
+          | CacheFiles
           | Help
           deriving (Ord, Eq, Show)
 
@@ -161,6 +167,7 @@ options = [ Option "c" ["ctags"]
             (ReqArg OutRedir "") "same as -o, but used as compatibility with ctags"
           , Option "x" ["extendedctag"]
             (NoArg ExtendedCtag) "Generate additional information in ctag file."
+          , Option "" ["cache"] (NoArg CacheFiles) "Cache file data."
           , Option "h" ["help"] (NoArg Help) "This help"
           ]
 
@@ -174,12 +181,12 @@ data Pos = Pos
                 Int      -- line number
                 Int      -- token number
                 String   -- string that makes up that line
-    deriving (Show, Eq)
+   deriving (Show,Eq,Typeable,Data)
 
 -- A definition we have found
 -- I'm not sure wether I've used the right names.. but I hope you fix it / get what I mean
 data FoundThingType = FTFuncTypeDef | FTFuncImpl | FTType | FTData | FTDataGADT | FTNewtype | FTClass | FTModule | FTCons | FTOther | FTConsAccessor | FTConsGADT
-  deriving Eq
+  deriving (Eq,Typeable,Data)
 
 instance Show FoundThingType where
   show FTFuncTypeDef = "ft"
@@ -196,10 +203,11 @@ instance Show FoundThingType where
   show FTOther = "o"
 
 data FoundThing = FoundThing FoundThingType ThingName Pos
-        deriving (Show, Eq)
+        deriving (Show,Eq,Typeable,Data)
 
 -- Data we have obtained from a file
 data FileData = FileData FileName [FoundThing]
+  deriving (Typeable,Data,Show)
 
 data Token = Token String Pos
             | NewLine Int -- space 8*" " = "\t"
@@ -285,6 +293,27 @@ spacedwords [] = []
 spacedwords xs = (blanks ++ wordchars) : spacedwords rest2
     where (blanks,rest) = span isSpace xs
           (wordchars,rest2) = break isSpace rest
+
+-- Find the definitions in a file, or load from cache if the file
+-- hasn't changed since last time.
+findWithCache :: Bool -> Bool -> FileName -> IO FileData
+findWithCache cache ignoreCloseImpl filename = do
+  cacheExists <- if cache then doesFileExist cacheFilename else return False
+  if cacheExists
+     then do fileModified <- getModificationTime filename
+             cacheModified <- getModificationTime cacheFilename
+             if cacheModified > fileModified
+              then do bytes <- BS.readFile cacheFilename
+                      return (decodeJSON (BS.unpack bytes))
+              else findAndCache
+     else findAndCache
+
+  where cacheFilename = filenameToTagsName filename
+        filenameToTagsName = (++"tags") . reverse . dropWhile (/='.') . reverse
+        findAndCache = do
+          filedata <- findthings ignoreCloseImpl filename
+          when cache (writeFile cacheFilename (encodeJSON filedata))
+          return filedata
 
 -- Find the definitions in a file
 findthings :: Bool -> FileName -> IO FileData
