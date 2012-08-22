@@ -11,7 +11,25 @@ Description:
 Category: Development
 build-type: Simple
 cabal-version: >=1.2
-extra-source-files: README
+extra-source-files:
+  README,
+  TODO,
+  testcases/test.sh,
+  testcases/1/testcase.hs,
+  testcases/2/testcase2.hs,
+  testcases/3/testcase3.lhs,
+  testcases/4/testcase4.hs,
+  testcases/5/HUnitBase.lhs,
+  testcases/6/Repair.lhs,
+  testcases/7/constructor.hs,
+  testcases/8/test_case.hs,
+  testcases/9/blockcomment.hs,
+  testcases/10/twoblockcommentshs.hs,
+  testcases/11/twoblockcommentslhs.lhs,
+  testcases/12/twoblockcommentstogether.hs,
+  testcases/13/typesig.hs,
+  testcases/14/module.hs,
+  testcases/15/space.hs
 
 -- Later, this isn't compatible with Cabal 1.2:
 -- source-repository head

@@ -281,18 +281,9 @@ etagsDumpFileData (FileData filename things) =
 
 etagsDumpThing :: FoundThing -> String
 etagsDumpThing (FoundThing _ _name (Pos _filename line token fullline)) =
-        concat (take (token + 1) $ spacedwords fullline)
+  let wrds = mywords True fullline
+  in concat (take token wrds ++ map (take 1) (take 1 $ drop token wrds))
         ++ "\x7f" ++ show line ++ "," ++ show (line + 1) ++ "\n"
-
-
--- like "words", but keeping the whitespace, and so letting us build
--- accurate prefixes
-
-spacedwords :: String -> [String]
-spacedwords [] = []
-spacedwords xs = (blanks ++ wordchars) : spacedwords rest2
-    where (blanks,rest) = span isSpace xs
-          (wordchars,rest2) = break isSpace rest
 
 -- Find the definitions in a file, or load from cache if the file
 -- hasn't changed since last time.
@@ -338,7 +329,7 @@ findthings ignoreCloseImpl filename = do
                       $ stripblockcomments
                       $ concat
                       $ zipWith3 (withline filename)
-                                 (map ( filter (not . all isSpace) . mywords) fileLines)
+                                 (map ( filter (not . all isSpace) . mywords False) fileLines)
                                  fileLines
                                  numbers
 
@@ -366,38 +357,50 @@ findthings ignoreCloseImpl filename = do
                          (FoundThing _ n2 (Pos f2 l2 _ _))
                          -> f1 == f2 && n1 == n2  && ( ( <= 7 ) $ abs $ l2 - l1))
               else id
-        return $ FileData filename $ iCI $ filterAdjacentFuncImpl $ concatMap findstuff sections
+        let things = iCI $ filterAdjacentFuncImpl $ concatMap findstuff sections
+        let
+          -- If there's a module with the same name of another definition, we
+          -- are not interested in the module, but only in the definition.
+          uniqueModuleName (FoundThing FTModule moduleName _)
+            = not
+              $ any (\(FoundThing thingType thingName _)
+                -> thingType /= FTModule && thingName == moduleName) things
+          uniqueModuleName _ = True
+        return $ FileData filename $ filter uniqueModuleName things
 
-  where 
-        evaluate :: String -> String        
-        evaluate [] = []
-        evaluate (c:cs) = c `seq` c:evaluate cs
-	-- my words is mainly copied from Data.List.
-	-- difference abc::def is recognized as three words
-        -- `abc` is recognized as "`" "abc" "`"
-	mywords :: String -> [String]
-	mywords ('{':xs) = "{" : mywords xs
-	mywords ('(':xs) = "(" : mywords xs
-	mywords ('`':xs) = "`" : mywords xs
-	mywords ('=':'>':xs) = "=>" : mywords xs
-	mywords ('=':xs) = "=" : mywords xs
-	mywords (',':xs) = "," : mywords xs
-	mywords (':':':':xs) = "::" : mywords xs
-	mywords s	=  case dropWhile {-partain:Char.-}isSpace s of
-                                ')':xs -> ")" : mywords xs
-				"" -> []
-				s' -> w : mywords s''
-				      where (w, s'') = myBreak s'
-					    myBreak [] = ([],[])
-					    myBreak (':':':':xs) = ([], "::"++xs)
-					    myBreak (')':xs) = ([],')':xs)
-                                            myBreak ('(':xs) = ([],'(':xs)
-					    myBreak ('`':xs) = ([],'`':xs)
-					    myBreak ('=':xs) = ([],'=':xs)
-					    myBreak (',':xs) = ([],',':xs)
-					    myBreak (' ':xs) = ([],xs);
-					    myBreak (x:xs) = let (a,b) = myBreak xs 
-							     in  (x:a,b)
+-- my words is mainly copied from Data.List.
+-- difference abc::def is recognized as three words
+-- `abc` is recognized as "`" "abc" "`"
+mywords :: Bool -> String -> [String]
+mywords spaced s =  case rest of
+                        ')':xs -> (blanks' ++ ")") : mywords spaced xs
+			"" -> []
+                        '{':'-':xs -> (blanks' ++ "{-") : mywords spaced xs
+                        '-':'}':xs -> (blanks' ++ "-}") : mywords spaced xs
+                        '{':xs -> (blanks' ++ "{") : mywords spaced xs
+                        '(':xs -> (blanks' ++ "(") : mywords spaced xs
+                        '`':xs -> (blanks' ++ "`") : mywords spaced xs
+                        '=':'>':xs -> (blanks' ++ "=>") : mywords spaced xs
+                        '=':xs -> (blanks' ++ "=") : mywords spaced xs
+                        ',':xs -> (blanks' ++ ",") : mywords spaced xs
+                        ':':':':xs -> (blanks' ++ "::") : mywords spaced xs
+			s' -> (blanks' ++ w) : mywords spaced s''
+			      where (w, s'') = myBreak s'
+				    myBreak [] = ([],[])
+				    myBreak (':':':':xs) = ([], "::"++xs)
+				    myBreak (')':xs) = ([],')':xs)
+                                    myBreak ('(':xs) = ([],'(':xs)
+				    myBreak ('`':xs) = ([],'`':xs)
+				    myBreak ('=':xs) = ([],'=':xs)
+				    myBreak (',':xs) = ([],',':xs)
+                                    myBreak xs@(' ':_)
+                                      | spaced = ([], xs)
+				      | otherwise  = ([], dropWhile isSpace xs)
+				    myBreak (x:xs) = let (a,b) = myBreak xs
+						     in  (x:a,b)
+                    where blanks' = if spaced then blanks else ""
+                          (blanks, rest) = span {-partain:Char.-}isSpace s
+
 	
 -- Create tokens from words, by recording their line number
 -- and which token they are through that line
@@ -424,13 +427,13 @@ stripblockcomments (x:xs) = x:stripblockcomments xs
 stripblockcomments [] = []
 
 afterlitend :: [Token] -> [Token]
-afterlitend (Token "\\begin{code}" _ : xs) = xs
+afterlitend (Token "\\begin{code}" _ : xs) = stripblockcomments xs
 afterlitend (_ : xs) = afterlitend xs
 afterlitend [] = []
 
 afterblockcomend :: [Token] -> [Token]
 afterblockcomend (t:xs)
- | contains "-}" (tokenString t) = xs
+ | contains "-}" (tokenString t) = stripblockcomments xs
  | otherwise           = afterblockcomend xs
 afterblockcomend [] = []
 

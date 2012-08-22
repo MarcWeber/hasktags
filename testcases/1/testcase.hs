@@ -55,13 +55,13 @@ module A.B.testcase(module System.FilePath.Windows) where
 -- to be found DBM
     newtype IE.ISession sess => DBM mark sess a = DBM (ReaderT sess IO a)
 
--- TODO 
+-- TODO
 
     -- to be found =~
     (=~)   :: (Regex rho) => String -> rho -> Bool
 
 
-    -- not to be found  : join
+    -- not to be found join
     -- to be found runGetState
     runGetState m str off =
         case unGet m (mkState str off) of
@@ -77,7 +77,7 @@ module A.B.testcase(module System.FilePath.Windows) where
     assertEqual :: (Eq a, Show a) => String -> a -> a -> Assertion
     assertEqual preface expected actual =
 
--- to be found CheckedException 
+-- to be found CheckedException
 -- to be found checkedException
     newtype CheckedException l = CheckedException {checkedException::SomeException} deriving (Typeable)
 
