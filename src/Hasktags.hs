@@ -1,5 +1,19 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-module Main (main) where
+-- should this be named Data.Hasktags or such?
+module Hasktags (
+  FileData,
+  findWithCache,
+  findthings,
+
+  Mode(..),
+  --  TODO think about these: Must they be exported ?
+  getMode,
+  getOutFile
+) where
+
+import Tags
+
+-- the lib
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.List
@@ -63,64 +77,6 @@ Really not a easy question - maybe there is an answer - I don't know
  
 
 -- Reference: http://ctags.sourceforge.net/FORMAT
-main :: IO ()
-main = do
-        progName <- getProgName
-        args <- getArgs
-        let usageString = 
-                   "Usage: " ++ progName ++ " [OPTION...] [files or directories...]\n"
-                ++ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs\n"
-                ++ "Thus hasktags . tags all important files in the current directory"
-        let (modes, files_or_dirs, errs) = getOpt Permute options args
-
-        filenames <- liftM (nub . concat) $ mapM (dirToFiles False) files_or_dirs
-
-        when (errs /= [] || elem Help modes || files_or_dirs == [])
-             (do putStr $ unlines errs
-                 putStr $ usageInfo usageString options
-                 exitWith (ExitFailure 1))
-
-        when (filenames == []) $ do
-          putStrLn "warning: no files found!"
-
-        let mode = getMode (filter ( `elem` [BothTags, CTags, ETags] ) modes)
-            openFileMode = if elem Append modes
-                           then AppendMode
-                           else WriteMode
-        filedata <- mapM (findWithCache (elem CacheFiles modes)
-                                        (IgnoreCloseImpl `elem` modes))
-                         filenames
-
-        when (mode == CTags)
-             (do ctagsfile <- getOutFile "tags" openFileMode modes
-                 writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
-                 hClose ctagsfile)
-
-        when (mode == ETags)
-             (do etagsfile <- getOutFile "TAGS" openFileMode modes
-                 writeetagsfile etagsfile filedata
-                 hClose etagsfile)
-
-        -- avoid problem when both is used in combination
-        -- with redirection on stdout
-        when (mode == BothTags)
-             (do etagsfile <- getOutFile "TAGS" openFileMode modes
-                 writeetagsfile etagsfile filedata
-                 ctagsfile <- getOutFile "tags" openFileMode modes
-                 writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
-                 hClose etagsfile
-                 hClose ctagsfile)
-
-dirToFiles :: Bool -> FilePath -> IO [ FilePath ]
-dirToFiles hsExtOnly p = do
-  isD <- doesDirectoryExist p
-  if isD then recurse p
-         else return $ if not hsExtOnly || ".hs" `isSuffixOf` p || ".lhs" `isSuffixOf` p then [p] else []
-  where recurse p = do
-            names <- liftM (filter ( (/= '.') . head ) ) $ getDirectoryContents p
-                                      -- skip . .. and hidden files (linux)  
-            liftM concat $ mapM (processFile . (p </>) ) names
-        processFile f = dirToFiles True f
 
 
 -- | getMode takes a list of modes and extract the mode with the
@@ -150,65 +106,6 @@ data Mode = ExtendedCtag
           | Help
           deriving (Ord, Eq, Show)
 
-options :: [OptDescr Mode]
-options = [ Option "c" ["ctags"]
-            (NoArg CTags) "generate CTAGS file (ctags)"
-          , Option "e" ["etags"]
-            (NoArg ETags) "generate ETAGS file (etags)"
-          , Option "b" ["both"]
-            (NoArg BothTags) "generate both CTAGS and ETAGS"
-          , Option "a" ["append"]
-            (NoArg Append) "append to existing CTAGS and/or ETAGS file(s). After this file will no longer be sorted!"
-          , Option "" ["ignore-close-implementation"]
-            (NoArg IgnoreCloseImpl) "ignores found implementation if its closer than 7 lines  - so you can jump to definition in one shot"
-          , Option "o" ["output"]
-            (ReqArg OutRedir "") "output to given file, instead of 'tags', '-' file is stdout"
-          , Option "f" ["file"]
-            (ReqArg OutRedir "") "same as -o, but used as compatibility with ctags"
-          , Option "x" ["extendedctag"]
-            (NoArg ExtendedCtag) "Generate additional information in ctag file."
-          , Option "" ["cache"] (NoArg CacheFiles) "Cache file data."
-          , Option "h" ["help"] (NoArg Help) "This help"
-          ]
-
-type FileName = String
-
-type ThingName = String
-
--- The position of a token or definition
-data Pos = Pos
-                FileName -- file name
-                Int      -- line number
-                Int      -- token number
-                String   -- string that makes up that line
-   deriving (Show,Eq,Typeable,Data)
-
--- A definition we have found
--- I'm not sure wether I've used the right names.. but I hope you fix it / get what I mean
-data FoundThingType = FTFuncTypeDef | FTFuncImpl | FTType | FTData | FTDataGADT | FTNewtype | FTClass | FTModule | FTCons | FTOther | FTConsAccessor | FTConsGADT
-  deriving (Eq,Typeable,Data)
-
-instance Show FoundThingType where
-  show FTFuncTypeDef = "ft"
-  show FTFuncImpl = "fi"
-  show FTType = "t"
-  show FTData = "d"
-  show FTDataGADT = "d_gadt"
-  show FTNewtype = "nt"
-  show FTClass = "c"
-  show FTModule = "m"
-  show FTCons = "cons"
-  show FTConsGADT = "c_gadt"
-  show FTConsAccessor = "c_a"
-  show FTOther = "o"
-
-data FoundThing = FoundThing FoundThingType ThingName Pos
-        deriving (Show,Eq,Typeable,Data)
-
--- Data we have obtained from a file
-data FileData = FileData FileName [FoundThing]
-  deriving (Typeable,Data,Show)
-
 data Token = Token String Pos
             | NewLine Int -- space 8*" " = "\t"
   deriving (Eq)
@@ -228,62 +125,6 @@ isNewLine _ _ = False
 
 trimNewlines :: [Token] -> [Token]
 trimNewlines = filter (not . isNewLine Nothing)
-
-
--- stuff for dealing with ctags output format
-
-writectagsfile :: Handle -> Bool -> [FileData] -> IO ()
-writectagsfile ctagsfile extended filedata = do
-    let things = concatMap getfoundthings filedata
-    when extended
-         (do hPutStrLn ctagsfile "!_TAG_FILE_FORMAT\t2\t/extended format; --format=1 will not append ;\" to lines/"
-             hPutStrLn ctagsfile "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted, 2=foldcase/"
-             hPutStrLn ctagsfile "!_TAG_PROGRAM_NAME\thasktags")
-    mapM_ (hPutStrLn ctagsfile . dumpthing extended) (sortThings things)
-
-sortThings :: [FoundThing] -> [FoundThing]
-sortThings = sortBy comp
-  where 
-        comp (FoundThing _ a (Pos f1 l1 _ _)) (FoundThing _ b (Pos f2 l2 _ _)) =
-            c (c (compare a b) $ (compare f1 f2)) (compare l1 l2)
-        c a b = if a == EQ then b else a
-
-
-getfoundthings :: FileData -> [FoundThing]
-getfoundthings (FileData _ things) = things
-
--- | Dump found tag in normal or extended (read : vim like) ctag
--- line
-dumpthing :: Bool -> FoundThing -> String
-dumpthing False (FoundThing _ name (Pos filename line _ _)) =
-    name ++ "\t" ++ filename ++ "\t" ++ show (line + 1)
-dumpthing True (FoundThing kind name (Pos filename line _ lineText)) =
-    name ++ "\t" ++ filename
-         ++ "\t/^" ++ concatMap ctagEncode lineText
-         ++ "$/;\"\t" ++ show kind
-         ++ "\tline:" ++ show (line + 1)
-
-ctagEncode :: Char -> String
-ctagEncode '/' = "\\/"
-ctagEncode '\\' = "\\\\"
-ctagEncode a = [a]
-
--- stuff for dealing with etags output format
-
-writeetagsfile :: Handle -> [FileData] -> IO ()
-writeetagsfile etagsfile = mapM_ (hPutStr etagsfile . etagsDumpFileData)
-
-etagsDumpFileData :: FileData -> String
-etagsDumpFileData (FileData filename things) =
-    "\x0c\n" ++ filename ++ "," ++ show thingslength ++ "\n" ++ thingsdump
-    where thingsdump = concatMap etagsDumpThing things
-          thingslength = length thingsdump
-
-etagsDumpThing :: FoundThing -> String
-etagsDumpThing (FoundThing _ _name (Pos _filename line token fullline)) =
-  let wrds = mywords True fullline
-  in concat (take token wrds ++ map (take 1) (take 1 $ drop token wrds))
-        ++ "\x7f" ++ show line ++ "," ++ show (line + 1) ++ "\n"
 
 -- Find the definitions in a file, or load from cache if the file
 -- hasn't changed since last time.
@@ -368,40 +209,6 @@ findthings ignoreCloseImpl filename = do
           uniqueModuleName _ = True
         return $ FileData filename $ filter uniqueModuleName things
 
--- my words is mainly copied from Data.List.
--- difference abc::def is recognized as three words
--- `abc` is recognized as "`" "abc" "`"
-mywords :: Bool -> String -> [String]
-mywords spaced s =  case rest of
-                        ')':xs -> (blanks' ++ ")") : mywords spaced xs
-			"" -> []
-                        '{':'-':xs -> (blanks' ++ "{-") : mywords spaced xs
-                        '-':'}':xs -> (blanks' ++ "-}") : mywords spaced xs
-                        '{':xs -> (blanks' ++ "{") : mywords spaced xs
-                        '(':xs -> (blanks' ++ "(") : mywords spaced xs
-                        '`':xs -> (blanks' ++ "`") : mywords spaced xs
-                        '=':'>':xs -> (blanks' ++ "=>") : mywords spaced xs
-                        '=':xs -> (blanks' ++ "=") : mywords spaced xs
-                        ',':xs -> (blanks' ++ ",") : mywords spaced xs
-                        ':':':':xs -> (blanks' ++ "::") : mywords spaced xs
-			s' -> (blanks' ++ w) : mywords spaced s''
-			      where (w, s'') = myBreak s'
-				    myBreak [] = ([],[])
-				    myBreak (':':':':xs) = ([], "::"++xs)
-				    myBreak (')':xs) = ([],')':xs)
-                                    myBreak ('(':xs) = ([],'(':xs)
-				    myBreak ('`':xs) = ([],'`':xs)
-				    myBreak ('=':xs) = ([],'=':xs)
-				    myBreak (',':xs) = ([],',':xs)
-                                    myBreak xs@(' ':_)
-                                      | spaced = ([], xs)
-				      | otherwise  = ([], dropWhile isSpace xs)
-				    myBreak (x:xs) = let (a,b) = myBreak xs
-						     in  (x:a,b)
-                    where blanks' = if spaced then blanks else ""
-                          (blanks, rest) = span {-partain:Char.-}isSpace s
-
-	
 -- Create tokens from words, by recording their line number
 -- and which token they are through that line
 
@@ -555,79 +362,3 @@ fromLiterate file lines =
             || (null literate || not ( any ( any ("\\begin" `isPrefixOf`). words . fst) lines))
         then lines
         else literate
-
-{- testcase:
-
-checkToBeFound(){
-  toBeFound=$(sed -n 's/-- to be found\s*//p' testcase.hs)
-  for i in $toBeFound; do
-    grep -l $i tags 2>&1 > /dev/null || echo "tag $i was not found"
-  done
-  echo -n "to be found ocunt: "
-  echo "$toBeFound" | wc -l
-}
-
--- to be found A.B.testcase
-module A.B.testcase(module System.FilePath.Windows) where
-    import asdf
-
--- to be found Request
--- to be found Request2
--- to be found rqBody
--- to be found rqMethod
--- to be found rqPeer
--- to be found Request3
-    data Request = Request2 { rqMethod::Method,
-                             rqBody    :: RqBody,
-                             rqPeer    :: Host
-                           }
-                  | Request3
-deriving(Show,Read,Typeable)
-    --  http://hackage.haskell.org/trac/ghc/ticket/1184
-    -- ! Convert Bool into another monad
--- to be found boolM
-    boolM False = mzero
-
--- to be found sadlkfj
-    sadlkfj
-     = 7
-
--- to be found onlyTheFirstOne
-    onlyTheFirstOne (x:xs) = 8
-    onlyTheFirstOne [] = 8
--- to be found AC
-    AC a b c d e f g = 7
--- to be found abc
-    abc = let a = 7
-              b = 8
-              in a + b
-            where x = 34
-                  o = 423
--- to be found BB
--- to be found AA
-    AA, BB :: Int
-
-
--- to be found foo
-    ad `foo` oh = 90
-
--- to be found X
--- to be found xyz
-    class (A a) => X a where
-      xyz :: dummy
--- to be found Z
--- to be found o
-    class (A a) => Z a where o :: Int
-
--- to be found ABC
-    newtype ABC = Int
--- to be found DBM
-    newtype IE.ISession sess => DBM mark sess a = DBM (ReaderT sess IO a)
--- to be found SAA
-newtype Symbol = SAA String
-
--- TODO 
-
--- to be found =~
-(=~)   :: (Regex rho) => String -> rho -> Bool
--}

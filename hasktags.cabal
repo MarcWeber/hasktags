@@ -15,32 +15,49 @@ Description:
 Category: Development
 build-type: Simple
 cabal-version: >=1.2
-extra-source-files:
-  README,
-  TODO,
-  testcases/test.sh,
-  testcases/1/testcase.hs,
-  testcases/2/testcase2.hs,
-  testcases/3/testcase3.lhs,
-  testcases/4/testcase4.hs,
-  testcases/5/HUnitBase.lhs,
-  testcases/6/Repair.lhs,
-  testcases/7/constructor.hs,
-  testcases/8/test_case.hs,
-  testcases/9/blockcomment.hs,
-  testcases/10/twoblockcommentshs.hs,
-  testcases/11/twoblockcommentslhs.lhs,
-  testcases/12/twoblockcommentstogether.hs,
-  testcases/13/typesig.hs,
-  testcases/14/module.hs,
-  testcases/15/space.hs
+
+-- TODO finish implementation
+Flag enable_caching
+  Default: True
+
 
 -- Later, this isn't compatible with Cabal 1.2:
 -- source-repository head
 --   type:     darcs
 --   location: http://code.haskell.org/hasktags/
 
+
 Executable hasktags
-    Main-Is: hasktags.hs
+    Main-Is: Main.hs
     -- < 6 because hasktags does not use special functions thus its unlikely to break
     Build-Depends: base < 6, bytestring, directory, filepath, json
+
+    hs-source-dirs: src
+
+    extra-source-files:
+      README,
+      TODO,
+      testcases/test.sh,
+      testcases/1/testcase.hs,
+      testcases/2/testcase2.hs,
+      testcases/3/testcase3.lhs,
+      testcases/4/testcase4.hs,
+      testcases/5/HUnitBase.lhs,
+      testcases/6/Repair.lhs,
+      testcases/7/constructor.hs,
+      testcases/8/test_case.hs,
+      testcases/9/blockcomment.hs,
+      testcases/10/twoblockcommentshs.hs,
+      testcases/11/twoblockcommentslhs.lhs,
+      testcases/12/twoblockcommentstogether.hs,
+      testcases/13/typesig.hs,
+      testcases/14/module.hs,
+      testcases/15/space.hs
+
+Test-Suite constructor
+  Type: exitcode-stdio-1.0
+  Main-Is: tests/tests.hs
+  Build-Depends:
+    base >= 4 && < 5,
+    process >= 1.1 && < 1.2,
+    HUnit >= 1.2 && < 1.3
