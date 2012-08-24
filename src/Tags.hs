@@ -144,5 +144,7 @@ etagsDumpThing :: FoundThing -> String
 etagsDumpThing (FoundThing _ _name (Pos _filename line token fullline)) =
   let wrds = mywords True fullline
   in concat (take token wrds ++ map (take 1) (take 1 $ drop token wrds))
-        ++ "\x7f" ++ show line ++ "," ++ show (line + 1) ++ "\n"
+        ++ "\x7f" $
+        ++ name ++ "\x01"
+        ++ show line ++ "," ++ show (line + 1) ++ "\n"
 
