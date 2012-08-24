@@ -54,10 +54,10 @@ Executable hasktags
       testcases/14/module.hs,
       testcases/15/space.hs
 
-Test-Suite constructor
+Test-Suite test
   Type: exitcode-stdio-1.0
-  Main-Is: tests/tests.hs
+  Main-Is: Test.hs
+  hs-source-dirs: src, tests
   Build-Depends:
     base >= 4 && < 5,
-    process >= 1.1 && < 1.2,
     HUnit >= 1.2 && < 1.3

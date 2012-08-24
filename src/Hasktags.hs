@@ -3,7 +3,8 @@
 module Hasktags (
   FileData,
   findWithCache,
-  findthings,
+  findThings,
+  findThingsInBS,
 
   Mode(..),
   --  TODO think about these: Must they be exported ?
@@ -143,14 +144,18 @@ findWithCache cache ignoreCloseImpl filename = do
   where cacheFilename = filenameToTagsName filename
         filenameToTagsName = (++"tags") . reverse . dropWhile (/='.') . reverse
         findAndCache = do
-          filedata <- findthings ignoreCloseImpl filename
+          filedata <- findThings ignoreCloseImpl filename
           when cache (writeFile cacheFilename (encodeJSON filedata))
           return filedata
 
 -- Find the definitions in a file
-findthings :: Bool -> FileName -> IO FileData
-findthings ignoreCloseImpl filename = do
-        aslines <- fmap (lines . BS.unpack) $ BS.readFile filename
+findThings :: Bool -> FileName -> IO FileData
+findThings ignoreCloseImpl filename =
+  fmap (findThingsInBS ignoreCloseImpl filename) $ BS.readFile filename
+
+findThingsInBS :: Bool -> String -> BS.ByteString -> FileData
+findThingsInBS ignoreCloseImpl filename bs = do
+        let aslines = lines $ BS.unpack $ bs 
 
         let stripNonHaskellLines = let
                   emptyLine = all (all isSpace . tokenString)
@@ -207,7 +212,7 @@ findthings ignoreCloseImpl filename = do
               $ any (\(FoundThing thingType thingName _)
                 -> thingType /= FTModule && thingName == moduleName) things
           uniqueModuleName _ = True
-        return $ FileData filename $ filter uniqueModuleName things
+        FileData filename $ filter uniqueModuleName things
 
 -- Create tokens from words, by recording their line number
 -- and which token they are through that line
