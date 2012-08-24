@@ -9,39 +9,39 @@
 -- to be found isAsciiLower
 -- to be found GeneralCategory
 -- to be found generalCategory
--- to be found toTitle
--- to be found digitToInt
+-- to be found toTitle  
+-- to be found digitToInt        
 
--- to be found UppercaseLetter
--- to be found LowercaseLetter
--- to be found TitlecaseLetter
--- to be found ModifierLetter
--- to be found OtherLetter
--- to be found NonSpacingMark
--- to be found SpacingCombiningMark
--- to be found EnclosingMark
--- to be found DecimalNumber
--- to be found LetterNumber
--- to be found OtherNumber
--- to be found ConnectorPunctuation
--- to be found DashPunctuation
--- to be found OpenPunctuation
--- to be found ClosePunctuation
--- to be found InitialQuote
--- to be found FinalQuote
--- to be found OtherPunctuation
--- to be found MathSymbol
--- to be found CurrencySymbol
--- to be found ModifierSymbol
--- to be found OtherSymbol
--- to be found Space
--- to be found LineSeparator
--- to be found ParagraphSeparator
--- to be found Control
--- to be found Format
--- to be found Surrogate
--- to be found PrivateUse
--- to be found NotAssigned
+-- to be found UppercaseLetter       
+-- to be found LowercaseLetter       
+-- to be found TitlecaseLetter       
+-- to be found ModifierLetter        
+-- to be found OtherLetter           
+-- to be found NonSpacingMark        
+-- to be found SpacingCombiningMark  
+-- to be found EnclosingMark         
+-- to be found DecimalNumber         
+-- to be found LetterNumber          
+-- to be found OtherNumber           
+-- to be found ConnectorPunctuation  
+-- to be found DashPunctuation       
+-- to be found OpenPunctuation       
+-- to be found ClosePunctuation      
+-- to be found InitialQuote          
+-- to be found FinalQuote            
+-- to be found OtherPunctuation      
+-- to be found MathSymbol            
+-- to be found CurrencySymbol        
+-- to be found ModifierSymbol        
+-- to be found OtherSymbol           
+-- to be found Space                 
+-- to be found LineSeparator         
+-- to be found ParagraphSeparator    
+-- to be found Control               
+-- to be found Format                
+-- to be found Surrogate             
+-- to be found PrivateUse            
+-- to be found NotAssigned           
 
 {-# OPTIONS_GHC -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
@@ -49,7 +49,7 @@
 -- Module      :  Data.Char
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
---
+-- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  stable
 -- Portability :  portable
@@ -58,7 +58,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Char
+module Data.Char 
     (
       Char
 
@@ -94,7 +94,7 @@ module Data.Char
     -- * String representations
     , showLitChar       -- :: Char -> ShowS
     , lexLitChar	-- :: ReadS String
-    , readLitChar       -- :: ReadS Char
+    , readLitChar       -- :: ReadS Char 
 
      -- Implementation checked wrt. Haskell 98 lib report, 1/99.
     ) where
@@ -124,7 +124,7 @@ import NHC.FFI (CInt)
 foreign import ccall unsafe "WCsubst.h u_gencat" wgencat :: CInt -> CInt
 #endif
 
--- | Convert a single digit 'Char' to the corresponding 'Int'.
+-- | Convert a single digit 'Char' to the corresponding 'Int'.  
 -- This function fails unless its argument satisfies 'isHexDigit',
 -- but recognises both upper and lower-case hexadecimal digits
 -- (i.e. @\'0\'@..@\'9\'@, @\'a\'@..@\'f\'@, @\'A\'@..@\'F\'@).

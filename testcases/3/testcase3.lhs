@@ -1,5 +1,5 @@
 -- list not complete
--- to be found DBM
+-- to be found DBM  
 -- to be found ifNull
 -- to be found result
 -- to be found result'
@@ -118,7 +118,7 @@ New style extension declarations.
 > import Data.IORef
 > import Data.Time
 > import Control.Monad.Trans (liftIO)
-> import Control.Exception (throw,
+> import Control.Exception (throw, 
 >            dynExceptions, throwDyn, bracket, Exception, finally)
 > import qualified Control.Exception (catch)
 > import Control.Monad.Fix
@@ -202,7 +202,7 @@ It passes anything else up.
 -- ** Session monad
 --------------------------------------------------------------------
 
-The DBM data constructor is NOT exported.
+The DBM data constructor is NOT exported. 
 
 One may think to quantify over sess in |withSession|. We won't need
 any mark then, I gather.
@@ -226,13 +226,13 @@ all class constraints for the Session (like IQuery, DBType, etc).
 | Typeable constraint is to prevent the leakage of Session and other
 marked objects.
 
-> withSession :: (Typeable a, IE.ISession sess) =>
+> withSession :: (Typeable a, IE.ISession sess) => 
 >     IE.ConnectA sess -> (forall mark. DBM mark sess a) -> IO a
-> withSession (IE.ConnectA connecta) m =
+> withSession (IE.ConnectA connecta) m = 
 >   bracket (connecta) (IE.disconnect) (runReaderT (unDBM m))
 
 
-| Persistent database connections.
+| Persistent database connections. 
 This issue has been brought up by Shanky Surana. The following design
 is inspired by that exchange.
 
@@ -241,8 +241,8 @@ have added them long time ago, to match HSQL, HDBC, and similar
 database interfaces. Alas, implementing persistent connection
 safely is another matter. The simplest design is like the following
 
- > withContinuedSession :: (Typeable a, IE.ISession sess) =>
- >     IE.ConnectA sess -> (forall mark. DBM mark sess a) ->
+ > withContinuedSession :: (Typeable a, IE.ISession sess) => 
+ >     IE.ConnectA sess -> (forall mark. DBM mark sess a) -> 
  >     IO (a, IE.ConnectA sess)
  > withContinuedSession (IE.ConnectA connecta) m = do
  >     conn <- connecta
@@ -280,12 +280,12 @@ we cannot reuse a connection. We have to write:
 
 etc. If we reuse a suspended connection or use a closed connection,
 we get a run-time (exception). That is of course not very
-satisfactory - and yet better than a segmentation fault.
+satisfactory - and yet better than a segmentation fault. 
 
-> withContinuedSession :: (Typeable a, IE.ISession sess) =>
->     IE.ConnectA sess -> (forall mark. DBM mark sess a)
+> withContinuedSession :: (Typeable a, IE.ISession sess) => 
+>     IE.ConnectA sess -> (forall mark. DBM mark sess a) 
 >     -> IO (a, IE.ConnectA sess)
-> withContinuedSession (IE.ConnectA connecta) m =
+> withContinuedSession (IE.ConnectA connecta) m = 
 >    do conn <- connecta  -- this invalidates connecta
 >       r <- runReaderT (unDBM m) conn
 >            `Control.Exception.catch` (\e -> IE.disconnect conn >> throw e)
@@ -416,7 +416,7 @@ in Typeable) so the bound statement can't leak either.
 >   -- ^ action to run over bound statement
 >   -> DBM mark s a
 > withBoundStatement (PreparedStmt stmt) ba f =
->   DBM ( ask >>= \s ->
+>   DBM ( ask >>= \s -> 
 >     lift $ IE.bindRun s stmt ba (\b -> runReaderT (unDBM (f b)) s))
 
 
@@ -443,7 +443,7 @@ The argument is applied, and the result returned.
 >   iterApply q [buf] seed fn  = do
 >     v <- liftIO $ IE.fetchCol q buf
 >     fn v seed
->   allocBuffers q _ n = liftIO $
+>   allocBuffers q _ n = liftIO $ 
 >         sequence [IE.allocBufferFor (undefined::a) q n]
 
 
@@ -532,7 +532,7 @@ Another auxiliary function, also not seen by the user.
 >         finalizer
 >         return (DBCursor ref)
 >     let
->       k' fni seed' =
+>       k' fni seed' = 
 >         let
 >           k fni' seed'' = do
 >             let k'' flag = if flag then k' fni' seed'' else close seed''
@@ -594,7 +594,7 @@ the mark.
 
 Returns the cursor. The return value is usually ignored.
 This function is not available to the end user (i.e. not exported).
-The cursor is closed automatically when its region exits.
+The cursor is closed automatically when its region exits. 
 
 > cursorClose c@(DBCursor ref) = do
 >   (_, maybeF) <- liftIO $ readIORef ref
@@ -629,7 +629,7 @@ unless there was an exception, in which case rollback.
 
 > withTransaction :: (IE.ISession s) =>
 >   IE.IsolationLevel -> DBM mark s a -> DBM mark s a
->
+> 
 > withTransaction isolation action = do
 >     beginTransaction isolation
 >     gcatch ( do
@@ -738,14 +738,14 @@ Let's look at some example code:
    See more explanation and examples below in /Iteratee Functions/ and
    /Bind Parameters/ sections.
 
-The first argument to 'Database.Enumerator.doQuery' must be an instance of
+The first argument to 'Database.Enumerator.doQuery' must be an instance of  
 'Database.InternalEnumerator.Statement'.
 Each back-end will provide a useful set of @Statement@ instances
 and associated constructor functions for them.
 For example, currently all back-ends have:
 
   * for basic, all-text statements (no bind variables, default row-caching)
-    which can be used as queries or commands:
+    which can be used as queries or commands: 
 
  >      sql "select ..."
 
@@ -932,7 +932,7 @@ inferred. The function ($) is a regular, rank-1 function, and so
 it can't take polymorphic functions as arguments and return
 polymorphic functions.
 
-Here's an example where ($) fails:
+Here's an example where ($) fails: 
 we supply a simple test program in the README file.
 If you change the @withSession@ line to use ($), like so
 (and remove the matching end-parenthese):
@@ -999,7 +999,7 @@ For DML statements, you must use 'Database.PostgreSQL.Enumerator.prepareCommand'
 as the library needs to do something different depending on whether or not the
 statement returns a result-set.
 
-For queries with large result-sets, we provide
+For queries with large result-sets, we provide 
 'Database.PostgreSQL.Enumerator.prepareLargeQuery',
 which takes an extra parameter: the number of rows to prefetch
 in a network call to the server.
