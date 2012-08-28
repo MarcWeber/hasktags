@@ -85,8 +85,8 @@ getMode xs = maximum xs
 --   if not found, open the file with name passed as parameter.
 --   Handle special file -, which is stdout
 getOutFile :: String -> IOMode -> [Mode] -> IO Handle
-getOutFile _           _        ((OutRedir "-"):_) = return stdout
-getOutFile _           openMode ((OutRedir f):_)   = openFile f openMode
+getOutFile _           _        (OutRedir "-" : _) = return stdout
+getOutFile _           openMode (OutRedir f : _)   = openFile f openMode
 getOutFile name        openMode (_:xs)             = getOutFile name openMode xs
 getOutFile defaultName openMode []                 = openFile defaultName openMode
 
@@ -149,7 +149,7 @@ findThings ignoreCloseImpl filename =
 
 findThingsInBS :: Bool -> String -> BS.ByteString -> FileData
 findThingsInBS ignoreCloseImpl filename bs = do
-        let aslines = lines $ BS.unpack $ bs
+        let aslines = lines $ BS.unpack bs
 
         let stripNonHaskellLines = let
                   emptyLine = all (all isSpace . tokenString)
@@ -222,13 +222,13 @@ withline filename sourceWords fullline i =
 -- comments stripping
 
 stripslcomments :: [[Token]] -> [[Token]]
-stripslcomments = let f ((NewLine _):(Token "--" _):_) = False
+stripslcomments = let f (NewLine _ : Token "--" _ : _) = False
                       f _ = True
                   in filter f
 
 stripblockcomments :: [Token] -> [Token]
-stripblockcomments ((Token "\\end{code}" _):xs) = afterlitend xs
-stripblockcomments ((Token "{-" _):xs) = afterblockcomend xs
+stripblockcomments (Token "\\end{code}" _ : xs) = afterlitend xs
+stripblockcomments (Token "{-" _ : xs) = afterblockcomend xs
 stripblockcomments (x:xs) = x:stripblockcomments xs
 stripblockcomments [] = []
 
@@ -252,19 +252,19 @@ contains sub = any (isPrefixOf sub) . tails
 -- actually pick up definitions
 
 findstuff :: [Token] -> [FoundThing]
-findstuff ((Token "module" _):(Token name pos):_) =
+findstuff (Token "module" _ : Token name pos : _) =
         [FoundThing FTModule name pos] -- nothing will follow this section
-findstuff ((Token "data" _):(Token name pos):xs)
+findstuff (Token "data" _ : Token name pos : xs)
         | any ( (== "where"). tokenString ) xs -- GADT
             -- TODO will be found as FTCons (not FTConsGADT), the same for functions - but they are found :)
             = FoundThing FTDataGADT name pos : getcons2 xs ++ fromWhereOn xs -- ++ (findstuff xs)
         | otherwise = FoundThing FTData name pos : getcons FTData (trimNewlines xs)-- ++ (findstuff xs)
-findstuff ((Token "newtype" _):ts@(((Token name pos)):_)) =
+findstuff (Token "newtype" _ : ts@(Token name pos : _)) =
         FoundThing FTNewtype name pos : getcons FTCons (trimNewlines ts)-- ++ (findstuff xs)
         -- FoundThing FTNewtype name pos : findstuff xs
-findstuff ((Token "type" _):(Token name pos):xs) =
+findstuff (Token "type" _ : Token name pos : xs) =
         FoundThing FTType name pos : findstuff xs
-findstuff ((Token "class" _):xs) = case break ((== "where").tokenString) xs of
+findstuff (Token "class" _ : xs) = case break ((== "where").tokenString) xs of
         (ys,[]) -> maybeToList $ className ys
         (_,r) -> maybe [] (:fromWhereOn r) $ className xs
     where isParenOpen (Token "(" _) = True
@@ -281,7 +281,7 @@ findFuncTypeDefs found (t@(Token _ _): Token "::" _ :_) =
           map (\(Token name p) -> FoundThing FTFuncTypeDef name p) (t:found)
 findFuncTypeDefs found (Token "(" _ :xs) =
           case break myBreakF xs of
-            (inner@((Token _ p):_), _:xs') ->
+            (inner@(Token _ p : _), _:xs') ->
               let merged = Token ( concatMap (\(Token x _) -> x) inner ) p
               in findFuncTypeDefs found $ merged : xs'
             _ -> []
@@ -292,7 +292,7 @@ findFuncTypeDefs _ _ = []
 fromWhereOn :: [Token] -> [FoundThing]
 fromWhereOn [] = []
 fromWhereOn [_] = []
-fromWhereOn (_: xs@((NewLine _):_)) =
+fromWhereOn (_: xs@(NewLine _ : _)) =
              concatMap (findstuff . tail')
              $ splitByNL (Just ( minimum
                                 . (10000:)
@@ -307,12 +307,12 @@ findFunc x = case findInfix x of
 
 findInfix :: [Token] -> [FoundThing]
 findInfix x = case dropWhile ((/= "`"). tokenString) (takeWhile ( (/= "=") . tokenString) x) of
-          _:(Token name p):_ -> [FoundThing FTFuncImpl name p]
+          _ : Token name p : _ -> [FoundThing FTFuncImpl name p]
           _ -> []
 
 
 findF :: [Token] -> [FoundThing]
-findF ((Token name p):xs) =
+findF (Token name p : xs) =
     [FoundThing FTFuncImpl name p | any (("=" ==) . tokenString) xs]
 findF _ = []
 
@@ -323,23 +323,23 @@ tail' [] = []
 -- get the constructor definitions, knowing that a datatype has just started
 
 getcons :: FoundThingType -> [Token] -> [FoundThing]
-getcons ftt ((Token "=" _):(Token name pos):xs) =
+getcons ftt (Token "=" _: Token name pos : xs) =
         FoundThing ftt name pos : getcons2 xs
 getcons ftt (_:xs) = getcons ftt xs
 getcons _ [] = []
 
 
 getcons2 :: [Token] -> [FoundThing]
-getcons2 ((Token name pos):(Token "::" _):xs) =
+getcons2 (Token name pos : Token "::" _ : xs) =
         FoundThing FTConsAccessor name pos : getcons2 xs
-getcons2 ((Token "=" _):_) = []
-getcons2 ((Token "|" _):(Token name pos):xs) =
+getcons2 (Token "=" _ : _) = []
+getcons2 (Token "|" _ : Token name pos : xs) =
         FoundThing FTCons name pos : getcons2 xs
 getcons2 (_:xs) = getcons2 xs
 getcons2 [] = []
 
 
-splitByNL :: (Maybe Int) -> [Token] -> [[Token]]
+splitByNL :: Maybe Int -> [Token] -> [[Token]]
 splitByNL maybeIndent (nl@(NewLine _):ts) =
   let (a,b) = break (isNewLine maybeIndent) ts
   in (nl : a) : splitByNL maybeIndent b
@@ -349,7 +349,7 @@ getTopLevelIndent :: [[Token]] -> Int
 getTopLevelIndent [] = 0 -- (no import found , assuming indent 0 : this can be
                          -- done better but should suffice for most needs
 getTopLevelIndent (x:xs) = if any ((=="import") . tokenString) x
-                          then let ((NewLine i):_) = x in i
+                          then let (NewLine i : _) = x in i
                           else getTopLevelIndent xs
 
 -- removes literate stuff if any line '> ... ' is found and any word is \begin (hglogger has ^> in it's commetns)

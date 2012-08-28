@@ -53,14 +53,13 @@ main = do
                  putStr $ usageInfo usageString options
                  exitWith (ExitFailure 1))
 
-        when (filenames == []) $ do
-          putStrLn "warning: no files found!"
+        when (filenames == []) $ putStrLn "warning: no files found!"
 
         let mode = getMode (filter ( `elem` [BothTags, CTags, ETags] ) modes)
-            openFileMode = if elem Append modes
+            openFileMode = if Append `elem` modes
                            then AppendMode
                            else WriteMode
-        filedata <- mapM (findWithCache (elem CacheFiles modes)
+        filedata <- mapM (findWithCache (CacheFiles `elem` modes)
                                         (IgnoreCloseImpl `elem` modes))
                          filenames
 
@@ -88,9 +87,9 @@ dirToFiles :: Bool -> FilePath -> IO [ FilePath ]
 dirToFiles hsExtOnly p = do
   isD <- doesDirectoryExist p
   if isD then recurse p
-         else return $ if not hsExtOnly || ".hs" `isSuffixOf` p || ".lhs" `isSuffixOf` p then [p] else []
+         else return [p | not hsExtOnly || ".hs" `isSuffixOf` p || ".lhs" `isSuffixOf` p]
   where recurse p' = do
             names <- liftM (filter ( (/= '.') . head ) ) $ getDirectoryContents p'
                                       -- skip . .. and hidden files (linux)
             liftM concat $ mapM (processFile . (p' </>) ) names
-        processFile f = dirToFiles True f
+        processFile = dirToFiles True

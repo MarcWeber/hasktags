@@ -43,7 +43,7 @@ comments lns comment = filter (not . null) $ map hitOrEmpty lns
     hitOrEmpty :: BS.ByteString -> String
     hitOrEmpty bs =
       let ds = BS.dropWhile (== ' ') bs
-      in if BS.isPrefixOf c ds
+      in if c `BS.isPrefixOf` ds
             then BS.unpack $ BS.drop (BS.length c) ds
             else ""
 
