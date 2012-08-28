@@ -3,20 +3,11 @@
 -- this should be moved into its own library (after cleaning up most of it ..)
 -- yes, this is still specific to hasktags :(
 module Tags where
-import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.List
-import Data.Maybe
 import Data.Data
-import Control.Monad( when )
 
 import System.IO
-import System.Environment
-import System.Directory
-import System.FilePath ((</>))
-import System.Console.GetOpt
-import System.Exit
-import Text.JSON.Generic
 import Control.Monad
 
 -- my words is mainly copied from Data.List.

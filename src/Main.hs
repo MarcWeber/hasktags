@@ -5,20 +5,13 @@ import Tags
 
 import System.Environment
 
-import qualified Data.ByteString.Char8 as BS
-import Data.Char
 import Data.List
-import Data.Maybe
-import Data.Data
-import Control.Monad( when )
 
 import System.IO
-import System.Environment
 import System.Directory
 import System.FilePath ((</>))
 import System.Console.GetOpt
 import System.Exit
-import Text.JSON.Generic
 import Control.Monad
 
 options :: [OptDescr Mode]
@@ -96,8 +89,8 @@ dirToFiles hsExtOnly p = do
   isD <- doesDirectoryExist p
   if isD then recurse p
          else return $ if not hsExtOnly || ".hs" `isSuffixOf` p || ".lhs" `isSuffixOf` p then [p] else []
-  where recurse p = do
-            names <- liftM (filter ( (/= '.') . head ) ) $ getDirectoryContents p
+  where recurse p' = do
+            names <- liftM (filter ( (/= '.') . head ) ) $ getDirectoryContents p'
                                       -- skip . .. and hidden files (linux)
-            liftM concat $ mapM (processFile . (p </>) ) names
+            liftM concat $ mapM (processFile . (p' </>) ) names
         processFile f = dirToFiles True f

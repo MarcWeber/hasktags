@@ -19,15 +19,9 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.List
 import Data.Maybe
-import Data.Data
-import Control.Monad( when )
 
 import System.IO
-import System.Environment
 import System.Directory
-import System.FilePath ((</>))
-import System.Console.GetOpt
-import System.Exit
 import Text.JSON.Generic
 import Control.Monad
 --import Debug.Trace
@@ -360,10 +354,10 @@ getTopLevelIndent (x:xs) = if any ((=="import") . tokenString) x
 
 -- removes literate stuff if any line '> ... ' is found and any word is \begin (hglogger has ^> in it's commetns)
 fromLiterate :: FilePath -> [(String, Int)] -> [(String, Int)]
-fromLiterate file lines =
-  let literate = [ (ls, n) |  ('>':ls, n) <- lines ]
+fromLiterate file lns =
+  let literate = [ (ls, n) |  ('>':ls, n) <- lns ]
   in if ".lhs" `isSuffixOf` file && (not . null $ literate) then literate -- not . null literate because of Repair.lhs of darcs
       else if (".hs" `isSuffixOf` file)
-            || (null literate || not ( any ( any ("\\begin" `isPrefixOf`). words . fst) lines))
-        then lines
+            || (null literate || not ( any ( any ("\\begin" `isPrefixOf`). words . fst) lns))
+        then lns
         else literate
