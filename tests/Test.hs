@@ -39,10 +39,10 @@ tagComments lines comment = filter (not . null) $ map hitOrEmpty lines
     c = BS.pack $ comment ++ " "
     hitOrEmpty :: BS.ByteString -> String
     hitOrEmpty bs =
-      let ds = BS.dropWhile (/= ' ')
-      in if BS.isPrefixOf c bs
+      let ds = BS.dropWhile (== ' ') bs
+      in if BS.isPrefixOf c ds
             then 
-              let bs2 = BS.drop (BS.length c) bs
+              let bs2 = BS.drop (BS.length c) ds
                   r = BS.takeWhile (/= ' ') bs2
               in if BS.all (`elem` "\n\r ") (BS.drop (BS.length r)  bs2)
                     then BS.unpack $ r
