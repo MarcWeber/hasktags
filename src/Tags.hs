@@ -125,7 +125,7 @@ writectagsfile ctagsfile extended filedata = do
 
 sortThings :: [FoundThing] -> [FoundThing]
 sortThings = sortBy comp
-  where 
+  where
         comp (FoundThing _ a (Pos f1 l1 _ _)) (FoundThing _ b (Pos f2 l2 _ _)) =
             c (c (compare a b) $ (compare f1 f2)) (compare l1 l2)
         c a b = if a == EQ then b else a

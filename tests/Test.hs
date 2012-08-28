@@ -37,7 +37,7 @@ fileCases = [
 -- all comments should differ at the beginning
 comments :: [BS.ByteString] -> String -> [String]
 comments lines comment = filter (not . null) $ map hitOrEmpty lines
-  where 
+  where
     c = BS.pack $ comment ++ " "
     hitOrEmpty :: BS.ByteString -> String
     hitOrEmpty bs =
@@ -50,13 +50,13 @@ tagComments :: [BS.ByteString] -> String -> [String]
 tagComments lns comment
   = map (takeWhile (not . (`elem` "\n\r "))) $ comments lns comment
 
-testToBeFound foundTagNames toBeFound = 
+testToBeFound foundTagNames toBeFound =
         "these were not found" ~: [] ~=? filter (not . (`elem` foundTagNames)) toBeFound
 
-testNotToBeFound foundTagNames notToBeFound = 
+testNotToBeFound foundTagNames notToBeFound =
         "these should not have been found" ~: [] ~=? filter (`elem` foundTagNames) notToBeFound
 
-testToBeFoundOnce foundTagNames list = 
+testToBeFoundOnce foundTagNames list =
         "these should have been found exactly one time" ~: [] ~=?  [ name | name <- list, 1 /= length (filter (==  name ) foundTagNames) ]
 
 etagsToBeFound etags toBeFound =

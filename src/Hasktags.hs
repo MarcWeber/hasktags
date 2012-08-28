@@ -59,7 +59,7 @@ Really not a easy question - maybe there is an answer - I don't know
   else non literate
 
 (*)  This is difficult because
- System.Log.Logger is using 
+ System.Log.Logger is using
   {-
   [...]
   > module Example where
@@ -68,14 +68,14 @@ Really not a easy question - maybe there is an answer - I don't know
   module System.Log.Logger(
   so it might looks like beeing a .lhs file
   My first fix was checking for \\begin occurence (doesn't work because HUnit is using > but no \\begin)
-  Further ideas: 
+  Further ideas:
     * use unlit executable distributed with ghc or the like and check for errors?
       (Will this work if cpp is used as well ?)
     * Remove comments before checking for '> ..'
       does'nt work because {- -} may be unbalanced in literate comments
   So my solution is : take file extension and keep guessing code for all unkown files
 -}
- 
+
 
 -- Reference: http://ctags.sourceforge.net/FORMAT
 
@@ -98,10 +98,10 @@ getOutFile defaultName openMode []                 = openFile defaultName openMo
 
 data Mode = ExtendedCtag
 		  | IgnoreCloseImpl
-          | ETags 
-          | CTags 
-          | BothTags 
-          | Append 
+          | ETags
+          | CTags
+          | BothTags
+          | Append
           | OutRedir String
           | CacheFiles
           | Help
@@ -155,7 +155,7 @@ findThings ignoreCloseImpl filename =
 
 findThingsInBS :: Bool -> String -> BS.ByteString -> FileData
 findThingsInBS ignoreCloseImpl filename bs = do
-        let aslines = lines $ BS.unpack $ bs 
+        let aslines = lines $ BS.unpack $ bs
 
         let stripNonHaskellLines = let
                   emptyLine = all (all isSpace . tokenString)
@@ -186,20 +186,20 @@ findThingsInBS ignoreCloseImpl filename bs = do
         -- so that z in
         -- let x = 7
         --     z = 20
-        -- won't be found as function 
-        let sections = map tail -- strip leading NL (no longer needed 
+        -- won't be found as function
+        let sections = map tail -- strip leading NL (no longer needed
                        $ filter (not . null)
                        $ splitByNL (Just (getTopLevelIndent tokenLines) )
                        $ concat tokenLines
         -- only take one of
         -- a 'x' = 7
         -- a _ = 0
-        let filterAdjacentFuncImpl = nubBy (\(FoundThing t1 n1 (Pos f1 _ _ _)) 
+        let filterAdjacentFuncImpl = nubBy (\(FoundThing t1 n1 (Pos f1 _ _ _))
                                              (FoundThing t2 n2 (Pos f2 _ _ _))
                                              -> f1 == f2 && n1 == n2 && t1 == FTFuncImpl && t2 == FTFuncImpl )
 
-        let iCI = if ignoreCloseImpl 
-              then nubBy (\(FoundThing _ n1 (Pos f1 l1 _ _)) 
+        let iCI = if ignoreCloseImpl
+              then nubBy (\(FoundThing _ n1 (Pos f1 l1 _ _))
                          (FoundThing _ n2 (Pos f2 l2 _ _))
                          -> f1 == f2 && n1 == n2  && ( ( <= 7 ) $ abs $ l2 - l1))
               else id
@@ -261,8 +261,8 @@ findstuff :: [Token] -> [FoundThing]
 findstuff ((Token "module" _):(Token name pos):_) =
         [FoundThing FTModule name pos] -- nothing will follow this section
 findstuff ((Token "data" _):(Token name pos):xs)
-        | any ( (== "where"). tokenString ) xs -- GADT 
-            -- TODO will be found as FTCons (not FTConsGADT), the same for functions - but they are found :) 
+        | any ( (== "where"). tokenString ) xs -- GADT
+            -- TODO will be found as FTCons (not FTConsGADT), the same for functions - but they are found :)
             = FoundThing FTDataGADT name pos : getcons2 xs ++ fromWhereOn xs -- ++ (findstuff xs)
         | otherwise = FoundThing FTData name pos : getcons FTData (trimNewlines xs)-- ++ (findstuff xs)
 findstuff ((Token "newtype" _):ts@(((Token name pos)):_)) =
@@ -292,7 +292,7 @@ findFuncTypeDefs found (Token "(" _ :xs) =
               in findFuncTypeDefs found $ merged : xs'
             _ -> []
     where myBreakF (Token ")" _) = True
-          myBreakF _ = False          
+          myBreakF _ = False
 findFuncTypeDefs _ _ = []
 
 fromWhereOn :: [Token] -> [FoundThing]
@@ -360,9 +360,9 @@ getTopLevelIndent (x:xs) = if any ((=="import") . tokenString) x
 
 -- removes literate stuff if any line '> ... ' is found and any word is \begin (hglogger has ^> in it's commetns)
 fromLiterate :: FilePath -> [(String, Int)] -> [(String, Int)]
-fromLiterate file lines = 
+fromLiterate file lines =
   let literate = [ (ls, n) |  ('>':ls, n) <- lines ]
-  in if ".lhs" `isSuffixOf` file && (not . null $ literate) then literate -- not . null literate because of Repair.lhs of darcs 
+  in if ".lhs" `isSuffixOf` file && (not . null $ literate) then literate -- not . null literate because of Repair.lhs of darcs
       else if (".hs" `isSuffixOf` file)
             || (null literate || not ( any ( any ("\\begin" `isPrefixOf`). words . fst) lines))
         then lines

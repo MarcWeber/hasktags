@@ -47,7 +47,7 @@ main :: IO ()
 main = do
         progName <- getProgName
         args <- getArgs
-        let usageString = 
+        let usageString =
                    "Usage: " ++ progName ++ " [OPTION...] [files or directories...]\n"
                 ++ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs\n"
                 ++ "Thus hasktags . tags all important files in the current directory"
@@ -98,6 +98,6 @@ dirToFiles hsExtOnly p = do
          else return $ if not hsExtOnly || ".hs" `isSuffixOf` p || ".lhs" `isSuffixOf` p then [p] else []
   where recurse p = do
             names <- liftM (filter ( (/= '.') . head ) ) $ getDirectoryContents p
-                                      -- skip . .. and hidden files (linux)  
+                                      -- skip . .. and hidden files (linux)
             liftM concat $ mapM (processFile . (p </>) ) names
         processFile f = dirToFiles True f
