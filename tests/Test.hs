@@ -1,11 +1,11 @@
 module Main where
 
+import Hasktags
+import Tags
+
 import Control.Monad
 import Data.List
 import System.Exit
-
-import Hasktags
-import Tags
 
 import qualified Data.ByteString.Char8 as BS
 
