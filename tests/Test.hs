@@ -1,6 +1,7 @@
 module Main where
 
 import Control.Monad
+import Data.List
 import System.Exit
 
 import Hasktags
@@ -33,21 +34,20 @@ fileCases = [
   ]
 
 -- all comments should differ at the beginning
-tagComments :: [BS.ByteString] -> String -> [String]
-tagComments lines comment = filter (not . null) $ map hitOrEmpty lines
+comments :: [BS.ByteString] -> String -> [String]
+comments lines comment = filter (not . null) $ map hitOrEmpty lines
   where 
     c = BS.pack $ comment ++ " "
     hitOrEmpty :: BS.ByteString -> String
     hitOrEmpty bs =
       let ds = BS.dropWhile (== ' ') bs
       in if BS.isPrefixOf c ds
-            then 
-              let bs2 = BS.drop (BS.length c) ds
-                  r = BS.takeWhile (/= ' ') bs2
-              in if BS.all (`elem` "\n\r ") (BS.drop (BS.length r)  bs2)
-                    then BS.unpack $ r
-                    else error $  "bad - failed parsing tag line " ++ BS.unpack bs2
+            then BS.unpack $ BS.drop (BS.length c) ds
             else ""
+
+tagComments :: [BS.ByteString] -> String -> [String]
+tagComments lns comment
+  = map (takeWhile (not . (`elem` "\n\r "))) $ comments lns comment
 
 testToBeFound foundTagNames toBeFound = 
         "these were not found" ~: [] ~=? filter (not . (`elem` foundTagNames)) toBeFound
@@ -58,17 +58,37 @@ testNotToBeFound foundTagNames notToBeFound =
 testToBeFoundOnce foundTagNames list = 
         "these should have been found exactly one time" ~: [] ~=?  [ name | name <- list, 1 /= length (filter (==  name ) foundTagNames) ]
 
+etagsToBeFound etags toBeFound =
+        "these were not found on TAGS"
+        ~: [] ~=? filter (not . (`isInfixOf` etags)) toBeFound
+
+etagsNotToBeFound etags notToBeFound =
+        "these should not have been found on TAGS"
+        ~: [] ~=? filter (`isInfixOf` etags) notToBeFound
+
+etagsOnceToBeFound etags list =
+        "these should not have been found on TAGS"
+        ~: [] ~=? [ name | name <- list, 1 /= length (infixes name etags)]
+
+infixes :: Eq a => [a] -> [a] -> [[a]]
+infixes needle haystack = filter (isPrefixOf needle) (tails haystack)
+
 createTestCase filename = do
   bs <- BS.readFile ("testcases/" ++ filename)
   let lines = BS.lines bs
-  let FileData _ things = findThingsInBS True filename bs
+  let fd = findThingsInBS True filename bs
+  let FileData _ things = fd
 
   let foundTagNames = [name | FoundThing _ name _ <- things]
+  let etags = etagsDumpFileData fd
 
   let testList = TestList [
           testToBeFound foundTagNames (tagComments lines "-- to be found"),
           testNotToBeFound foundTagNames (tagComments lines "-- not to be found"),
-          testToBeFoundOnce foundTagNames (tagComments lines "-- once to be found")
+          testToBeFoundOnce foundTagNames (tagComments lines "-- once to be found"),
+          etagsToBeFound etags (comments lines "-- TAGS to be found"),
+          etagsNotToBeFound etags (comments lines "-- TAGS not to be found"),
+          etagsOnceToBeFound etags (comments lines "-- TAGS once to be found")
         ]
 
   return $ filename ~: testList
