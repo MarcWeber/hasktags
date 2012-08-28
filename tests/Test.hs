@@ -46,7 +46,7 @@ tagComments lines comment = filter (not . null) $ map hitOrEmpty lines
                   r = BS.takeWhile (/= ' ') bs2
               in if BS.all (`elem` "\n\r ") (BS.drop (BS.length r)  bs2)
                     then BS.unpack $ r
-                    else error $  "bad - faileding parsing tag line" ++ BS.unpack bs2
+                    else error $  "bad - failed parsing tag line " ++ BS.unpack bs2
             else ""
 
 testToBeFound foundTagNames toBeFound = 
