@@ -48,8 +48,12 @@ source-repository head
 
 Executable hasktags
     Main-Is: Main.hs
-    -- < 6 because hasktags does not use special functions thus its unlikely to break
-    Build-Depends: base < 6, bytestring, directory, filepath, json
+    Build-Depends:
+      base >= 4 && < 5,
+      bytestring >= 0.9 && < 0.10,
+      directory >= 1.1 && < 1.2,
+      filepath >= 1.3 && < 1.4,
+      json >= 0.5 && < 0.6
     hs-source-dirs: src
     default-language: Haskell2010
 
