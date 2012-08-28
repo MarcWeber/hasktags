@@ -1,9 +1,12 @@
 module Main where
+
+import Control.Monad
+import System.Exit
+
 import Hasktags
 import Tags
 
 import qualified Data.ByteString.Char8 as BS
-import System.IO.Unsafe (unsafePerformIO)
 
 import Test.HUnit
 
@@ -70,5 +73,8 @@ createTestCase filename = do
 
   return $ filename ~: testList
 
-main =
-  runTestTT $ TestList $ unsafePerformIO $ mapM createTestCase fileCases
+main
+  = do
+    tests <- mapM createTestCase fileCases
+    counts_ <- runTestTT $ TestList tests
+    when (errors counts_ + failures counts_ > 0) exitFailure
