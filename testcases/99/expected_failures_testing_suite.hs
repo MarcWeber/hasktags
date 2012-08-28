@@ -1,4 +1,4 @@
--- this file only exists to test all cases once .. all sohuld fail
+-- this file only exists to test all cases once .. all should fail
 module C
 
 -- to be found A
