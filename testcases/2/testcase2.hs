@@ -4,7 +4,6 @@
 -- to be found isPunctuation
 -- to be found isSymbol
 -- to be found isSeparator
--- to be found isAscii
 -- to be found isAsciiUpper
 -- to be found isAsciiLower
 -- to be found GeneralCategory
