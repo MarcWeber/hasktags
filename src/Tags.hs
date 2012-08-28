@@ -44,11 +44,13 @@ mywords spaced s =  case rest of
 				    myBreak ('`':xs) = ([],'`':xs)
 				    myBreak ('=':xs) = ([],'=':xs)
 				    myBreak (',':xs) = ([],',':xs)
-                                    myBreak xs@(' ':_)
-                                      | spaced = ([], xs)
-				      | otherwise  = ([], dropWhile isSpace xs)
-				    myBreak (x:xs) = let (a,b) = myBreak xs
-						     in  (x:a,b)
+                                    myBreak xss@(x:xs)
+                                      | isSpace x
+                                        = if spaced
+                                          then ([], xss)
+                                          else ([], dropWhile isSpace xss)
+                                      | otherwise = let (a,b) = myBreak xs
+						    in  (x:a,b)
                     where blanks' = if spaced then blanks else ""
                           (blanks, rest) = span {-partain:Char.-}isSpace s
 

@@ -30,7 +30,8 @@ fileCases = [
     "7/constructor.hs",
     "9/blockcomment.hs",
     "16/firstconstructor.hs",
-    "17/substring.hs"
+    "17/substring.hs",
+    "18/tabs.hs"
   ]
 
 -- all comments should differ at the beginning
