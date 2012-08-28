@@ -22,13 +22,19 @@ options = [ Option "c" ["ctags"]
           , Option "b" ["both"]
             (NoArg BothTags) "generate both CTAGS and ETAGS"
           , Option "a" ["append"]
-            (NoArg Append) "append to existing CTAGS and/or ETAGS file(s). After this file will no longer be sorted!"
+              (NoArg Append)
+            $ "append to existing CTAGS and/or ETAGS file(s). After this file "
+              ++ "will no longer be sorted!"
           , Option "" ["ignore-close-implementation"]
-            (NoArg IgnoreCloseImpl) "ignores found implementation if its closer than 7 lines  - so you can jump to definition in one shot"
+              (NoArg IgnoreCloseImpl)
+            $ "ignores found implementation if its closer than 7 lines  - so "
+              ++ "you can jump to definition in one shot"
           , Option "o" ["output"]
-            (ReqArg OutRedir "") "output to given file, instead of 'tags', '-' file is stdout"
+            (ReqArg OutRedir "")
+            "output to given file, instead of 'tags', '-' file is stdout"
           , Option "f" ["file"]
-            (ReqArg OutRedir "") "same as -o, but used as compatibility with ctags"
+            (ReqArg OutRedir "")
+            "same as -o, but used as compatibility with ctags"
           , Option "x" ["extendedctag"]
             (NoArg ExtendedCtag) "Generate additional information in ctag file."
           , Option "" ["cache"] (NoArg CacheFiles) "Cache file data."
@@ -41,12 +47,15 @@ main = do
         progName <- getProgName
         args <- getArgs
         let usageString =
-                   "Usage: " ++ progName ++ " [OPTION...] [files or directories...]\n"
+                   "Usage: " ++ progName
+                ++ " [OPTION...] [files or directories...]\n"
                 ++ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs\n"
-                ++ "Thus hasktags . tags all important files in the current directory"
+                ++ "Thus hasktags . tags all important files in the current "
+                ++ "directory"
         let (modes, files_or_dirs, errs) = getOpt Permute options args
 
-        filenames <- liftM (nub . concat) $ mapM (dirToFiles False) files_or_dirs
+        filenames
+          <- liftM (nub . concat) $ mapM (dirToFiles False) files_or_dirs
 
         when (errs /= [] || elem Help modes || files_or_dirs == [])
              (do putStr $ unlines errs
@@ -87,9 +96,11 @@ dirToFiles :: Bool -> FilePath -> IO [ FilePath ]
 dirToFiles hsExtOnly p = do
   isD <- doesDirectoryExist p
   if isD then recurse p
-         else return [p | not hsExtOnly || ".hs" `isSuffixOf` p || ".lhs" `isSuffixOf` p]
+         else return
+           [p | not hsExtOnly || ".hs" `isSuffixOf` p || ".lhs" `isSuffixOf` p]
   where recurse p' = do
-            names <- liftM (filter ( (/= '.') . head ) ) $ getDirectoryContents p'
+            names
+              <- liftM (filter ( (/= '.') . head ) ) $ getDirectoryContents p'
                                       -- skip . .. and hidden files (linux)
             liftM concat $ mapM (processFile . (p' </>) ) names
         processFile = dirToFiles True

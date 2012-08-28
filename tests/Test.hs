@@ -53,15 +53,20 @@ tagComments lns comment
 
 testToBeFound :: [String] -> [String] -> Test
 testToBeFound foundTagNames toBeFound =
-        "these were not found" ~: [] ~=? filter (not . (`elem` foundTagNames)) toBeFound
+        "these were not found"
+        ~: [] ~=? filter (not . (`elem` foundTagNames)) toBeFound
 
 testNotToBeFound :: [String] -> [String] -> Test
 testNotToBeFound foundTagNames notToBeFound =
-        "these should not have been found" ~: [] ~=? filter (`elem` foundTagNames) notToBeFound
+        "these should not have been found"
+        ~: [] ~=? filter (`elem` foundTagNames) notToBeFound
 
 testToBeFoundOnce :: [String] -> [String] -> Test
 testToBeFoundOnce foundTagNames list =
-        "these should have been found exactly one time" ~: [] ~=?  [ name | name <- list, 1 /= length (filter (==  name ) foundTagNames) ]
+        "these should have been found exactly one time"
+        ~: []
+          ~=? [name
+            | name <- list, 1 /= length (filter (==  name ) foundTagNames)]
 
 etagsToBeFound :: String -> [String] -> Test
 etagsToBeFound etags toBeFound =
@@ -94,7 +99,9 @@ createTestCase filename = do
   let testList = TestList [
           testToBeFound foundTagNames (tagComments lns "-- to be found"),
           testNotToBeFound foundTagNames (tagComments lns "-- not to be found"),
-          testToBeFoundOnce foundTagNames (tagComments lns "-- once to be found"),
+          testToBeFoundOnce
+            foundTagNames
+            (tagComments lns "-- once to be found"),
           etagsToBeFound etags (comments lns "-- TAGS to be found"),
           etagsNotToBeFound etags (comments lns "-- TAGS not to be found"),
           etagsToBeFoundOnce etags (comments lns "-- TAGS once to be found")

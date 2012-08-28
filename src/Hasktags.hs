@@ -61,13 +61,16 @@ Really not a easy question - maybe there is an answer - I don't know
   -}
   module System.Log.Logger(
   so it might looks like beeing a .lhs file
-  My first fix was checking for \\begin occurence (doesn't work because HUnit is using > but no \\begin)
+  My first fix was checking for \\begin occurence (doesn't work because HUnit is
+  using > but no \\begin)
   Further ideas:
-    * use unlit executable distributed with ghc or the like and check for errors?
+    * use unlit executable distributed with ghc or the like and check for
+      errors?
       (Will this work if cpp is used as well ?)
     * Remove comments before checking for '> ..'
       does'nt work because {- -} may be unbalanced in literate comments
-  So my solution is : take file extension and keep guessing code for all unkown files
+  So my solution is : take file extension and keep guessing code for all unkown
+  files
 -}
 
 
@@ -88,7 +91,9 @@ getOutFile :: String -> IOMode -> [Mode] -> IO Handle
 getOutFile _           _        (OutRedir "-" : _) = return stdout
 getOutFile _           openMode (OutRedir f : _)   = openFile f openMode
 getOutFile name        openMode (_:xs)             = getOutFile name openMode xs
-getOutFile defaultName openMode []                 = openFile defaultName openMode
+getOutFile defaultName openMode []                 = openFile
+                                                     defaultName
+                                                     openMode
 
 data Mode = ExtendedCtag
 		  | IgnoreCloseImpl
@@ -158,10 +163,13 @@ findThingsInBS ignoreCloseImpl filename bs = do
                   cppLine _ = False
                 in filter (not . emptyLine) . filter (not . cppLine)
 
-        --  remove -- comments, then break each line into tokens (adding line numbers)
+        --  remove -- comments, then break each line into tokens (adding line
+        --  numbers)
         --  then remove {- -} comments
         --  split by lines again ( to get indent
-        let (fileLines, numbers) = unzip . fromLiterate filename $ zip aslines [0..]
+        let
+          (fileLines, numbers)
+            = unzip . fromLiterate filename $ zip aslines [0..]
         let tokenLines =
                       stripNonHaskellLines
                       $ stripslcomments
@@ -169,7 +177,9 @@ findThingsInBS ignoreCloseImpl filename bs = do
                       $ stripblockcomments
                       $ concat
                       $ zipWith3 (withline filename)
-                                 (map ( filter (not . all isSpace) . mywords False) fileLines)
+                                 (map
+                                   (filter (not . all isSpace) . mywords False)
+                                   fileLines)
                                  fileLines
                                  numbers
 
@@ -190,12 +200,17 @@ findThingsInBS ignoreCloseImpl filename bs = do
         -- a _ = 0
         let filterAdjacentFuncImpl = nubBy (\(FoundThing t1 n1 (Pos f1 _ _ _))
                                              (FoundThing t2 n2 (Pos f2 _ _ _))
-                                             -> f1 == f2 && n1 == n2 && t1 == FTFuncImpl && t2 == FTFuncImpl )
+                                             -> f1 == f2
+                                               && n1 == n2
+                                               && t1 == FTFuncImpl
+                                               && t2 == FTFuncImpl )
 
         let iCI = if ignoreCloseImpl
               then nubBy (\(FoundThing _ n1 (Pos f1 l1 _ _))
                          (FoundThing _ n2 (Pos f2 l2 _ _))
-                         -> f1 == f2 && n1 == n2  && ( ( <= 7 ) $ abs $ l2 - l1))
+                         -> f1 == f2
+                           && n1 == n2
+                           && ((<= 7) $ abs $ l2 - l1))
               else id
         let things = iCI $ filterAdjacentFuncImpl $ concatMap findstuff sections
         let
@@ -256,11 +271,16 @@ findstuff (Token "module" _ : Token name pos : _) =
         [FoundThing FTModule name pos] -- nothing will follow this section
 findstuff (Token "data" _ : Token name pos : xs)
         | any ( (== "where"). tokenString ) xs -- GADT
-            -- TODO will be found as FTCons (not FTConsGADT), the same for functions - but they are found :)
-            = FoundThing FTDataGADT name pos : getcons2 xs ++ fromWhereOn xs -- ++ (findstuff xs)
-        | otherwise = FoundThing FTData name pos : getcons FTData (trimNewlines xs)-- ++ (findstuff xs)
+            -- TODO will be found as FTCons (not FTConsGADT), the same for
+            -- functions - but they are found :)
+            = FoundThing FTDataGADT name pos
+              : getcons2 xs ++ fromWhereOn xs -- ++ (findstuff xs)
+        | otherwise
+            = FoundThing FTData name pos
+              : getcons FTData (trimNewlines xs)-- ++ (findstuff xs)
 findstuff (Token "newtype" _ : ts@(Token name pos : _)) =
-        FoundThing FTNewtype name pos : getcons FTCons (trimNewlines ts)-- ++ (findstuff xs)
+        FoundThing FTNewtype name pos
+          : getcons FTCons (trimNewlines ts)-- ++ (findstuff xs)
         -- FoundThing FTNewtype name pos : findstuff xs
 findstuff (Token "type" _ : Token name pos : xs) =
         FoundThing FTType name pos : findstuff xs
@@ -269,9 +289,14 @@ findstuff (Token "class" _ : xs) = case break ((== "where").tokenString) xs of
         (_,r) -> maybe [] (:fromWhereOn r) $ className xs
     where isParenOpen (Token "(" _) = True
           isParenOpen _ = False
-          className lst = case (head . dropWhile isParenOpen . reverse . takeWhile ((/= "=>").tokenString) . reverse) lst of
-            (Token name p) -> Just $ FoundThing FTClass name p
-            _ -> Nothing
+          className lst
+            = case (head
+                  . dropWhile isParenOpen
+                  . reverse
+                  . takeWhile ((/= "=>") . tokenString)
+                  . reverse) lst of
+              (Token name p) -> Just $ FoundThing FTClass name p
+              _ -> Nothing
 findstuff xs = findFunc xs ++ findFuncTypeDefs [] xs
 
 findFuncTypeDefs :: [Token] -> [Token] -> [FoundThing]
@@ -306,9 +331,12 @@ findFunc x = case findInfix x of
     _ -> findF x
 
 findInfix :: [Token] -> [FoundThing]
-findInfix x = case dropWhile ((/= "`"). tokenString) (takeWhile ( (/= "=") . tokenString) x) of
-          _ : Token name p : _ -> [FoundThing FTFuncImpl name p]
-          _ -> []
+findInfix x
+   = case dropWhile
+       ((/= "`"). tokenString)
+       (takeWhile ( (/= "=") . tokenString) x) of
+     _ : Token name p : _ -> [FoundThing FTFuncImpl name p]
+     _ -> []
 
 
 findF :: [Token] -> [FoundThing]
@@ -352,12 +380,15 @@ getTopLevelIndent (x:xs) = if any ((=="import") . tokenString) x
                           then let (NewLine i : _) = x in i
                           else getTopLevelIndent xs
 
--- removes literate stuff if any line '> ... ' is found and any word is \begin (hglogger has ^> in it's commetns)
+-- removes literate stuff if any line '> ... ' is found and any word is \begin
+-- (hglogger has ^> in it's commetns)
 fromLiterate :: FilePath -> [(String, Int)] -> [(String, Int)]
 fromLiterate file lns =
   let literate = [ (ls, n) |  ('>':ls, n) <- lns ]
-  in if ".lhs" `isSuffixOf` file && (not . null $ literate) then literate -- not . null literate because of Repair.lhs of darcs
+ -- not . null literate because of Repair.lhs of darcs
+  in if ".lhs" `isSuffixOf` file && (not . null $ literate) then literate
       else if (".hs" `isSuffixOf` file)
-            || (null literate || not ( any ( any ("\\begin" `isPrefixOf`). words . fst) lns))
+            || (null literate
+            || not ( any ( any ("\\begin" `isPrefixOf`). words . fst) lns))
         then lns
         else literate

@@ -59,8 +59,21 @@ data Pos = Pos
    deriving (Show,Eq,Typeable,Data)
 
 -- A definition we have found
--- I'm not sure wether I've used the right names.. but I hope you fix it / get what I mean
-data FoundThingType = FTFuncTypeDef | FTFuncImpl | FTType | FTData | FTDataGADT | FTNewtype | FTClass | FTModule | FTCons | FTOther | FTConsAccessor | FTConsGADT
+-- I'm not sure wether I've used the right names.. but I hope you fix it / get
+-- what I mean
+data FoundThingType
+  = FTFuncTypeDef
+    | FTFuncImpl
+    | FTType
+    | FTData
+    | FTDataGADT
+    | FTNewtype
+    | FTClass
+    | FTModule
+    | FTCons
+    | FTOther
+    | FTConsAccessor
+    | FTConsGADT
   deriving (Eq,Typeable,Data)
 
 instance Show FoundThingType where
@@ -109,8 +122,13 @@ writectagsfile :: Handle -> Bool -> [FileData] -> IO ()
 writectagsfile ctagsfile extended filedata = do
     let things = concatMap getfoundthings filedata
     when extended
-         (do hPutStrLn ctagsfile "!_TAG_FILE_FORMAT\t2\t/extended format; --format=1 will not append ;\" to lines/"
-             hPutStrLn ctagsfile "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted, 2=foldcase/"
+         (do hPutStrLn
+                 ctagsfile
+               $ "!_TAG_FILE_FORMAT\t2\t/extended format; --format=1 will not "
+                 ++ "append ;\" to lines/"
+             hPutStrLn
+               ctagsfile
+               "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted, 2=foldcase/"
              hPutStrLn ctagsfile "!_TAG_PROGRAM_NAME\thasktags")
     mapM_ (hPutStrLn ctagsfile . dumpthing extended) (sortThings things)
 
