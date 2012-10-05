@@ -5,6 +5,7 @@ import Tags
 
 import Control.Monad
 import Data.List
+import System.Directory
 import System.Exit
 
 import qualified Data.ByteString.Char8 as BS
@@ -15,25 +16,6 @@ import Test.HUnit
 Test the library (recursive, caching, ..)
 But that's less likely to break
 -}
-
-fileCases :: [FilePath]
-fileCases = [
-    -- "99/expected_failures_testing_suite.hs",
-    "1/testcase.hs",
-    "2/testcase2.hs",
-    "4/testcase4.hs",
-    "8/test_case.hs",
-    "10/twoblockcommentshs.hs",
-    "12/twoblockcommentstogether.hs",
-    "13/typesig.hs",
-    "14/module.hs",
-    "15/space.hs",
-    "7/constructor.hs",
-    "9/blockcomment.hs",
-    "16/firstconstructor.hs",
-    "17/substring.hs",
-    "18/tabs.hs"
-  ]
 
 -- all comments should differ at the beginning
 comments :: [BS.ByteString] -> String -> [String]
@@ -88,7 +70,7 @@ infixes needle haystack = filter (isPrefixOf needle) (tails haystack)
 
 createTestCase :: FilePath -> IO Test
 createTestCase filename = do
-  bs <- BS.readFile ("testcases/" ++ filename)
+  bs <- BS.readFile filename
   let lns = BS.lines bs
   let fd = findThingsInBS True filename bs
   let FileData _ things = fd
@@ -112,6 +94,8 @@ createTestCase filename = do
 main :: IO ()
 main
   = do
-    tests <- mapM createTestCase fileCases
+    setCurrentDirectory "testcases"
+    files <- getDirectoryContents "."
+    tests <- mapM createTestCase $ filter (not . (`elem` [".", "..", "expected_failures_testing_suite.hs"])) files
     counts_ <- runTestTT $ TestList tests
     when (errors counts_ + failures counts_ > 0) exitFailure
