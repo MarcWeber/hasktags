@@ -7,8 +7,8 @@ Author: The GHC Team
 Maintainer:
  Marc Weber <marco-oweber@gmx.de>,
  Marco Túlio Pimenta Gontijo <marcotmarcot@gmail.com>
-homepage: http://github.com/marcotmarcot/hasktags
-bug-reports: http://github.com/marcotmarcot/hasktags/issues
+homepage: http://github.com/MarcWeber/hasktags
+bug-reports: http://github.com/MarcWeber/hasktags/issues
 Synopsis: Produces ctags "tags" and etags "TAGS" files for Haskell programs
 Description:
 	Produces ctags "tags" and etags "TAGS" files for Haskell programs.

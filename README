@@ -49,6 +49,9 @@ Things which could be done in the future:
 - make json support optional
 - Marco Túlio Pimenta Gontijo proposed replacing json by aeson because it might
   be faster
+- write a nice README.md file instead
+
+maintainers: See cabal file
 
 contributors:
   Marco Túlio Pimenta Gontijo (github/marcotmarcot)
