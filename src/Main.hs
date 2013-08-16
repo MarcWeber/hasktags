@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 module Main (main) where
 import Hasktags
@@ -9,6 +10,9 @@ import Data.List
 
 import System.IO
 import System.Directory
+#ifdef VERSION_unix
+import System.Posix.Files
+#endif
 import System.FilePath ((</>))
 import System.Console.GetOpt
 import System.Exit
@@ -98,6 +102,10 @@ dirToFiles named p = do
   case isD of
     False -> return $ if named || isHaskell then [p] else []
     True -> do
+#ifdef VERSION_unix
+      isL <- isSymbolicLink `fmap` getSymbolicLinkStatus p
+      if not named && isL then return [] else do
+#endif
         contents <- filter ((/=) "." . take 1) `fmap` getDirectoryContents p
         concat `fmap` mapM (dirToFiles False . (</>) p) contents
   where isHaskell = any (`isSuffixOf` p) [".hs", ".lhs"]
