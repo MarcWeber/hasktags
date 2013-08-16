@@ -9,7 +9,7 @@ hasktags: a tool to generate tag files for vim and emacs
   so that you can find / jump to them fast.
 
 HOWTO (GENERATING TAG FILES):
-  ghc --make hasktags.hs
+  Build hasktags (standard cabal build)
 
   I've been using this bash function or something similar for a long time.
   It may be cumbersome but works:
@@ -54,6 +54,7 @@ Things which could be done in the future:
 maintainers: See cabal file
 
 contributors:
+  Tsuru Capital (github/liyang)
   Marco Túlio Pimenta Gontijo (github/marcotmarcot)
   TODO: add all people having contributed before Oct 2012
   This includes people contributing to the darcs repository as well as people
