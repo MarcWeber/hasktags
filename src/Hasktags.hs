@@ -96,14 +96,16 @@ getOutFile defaultName openMode []                 = openFile
                                                      openMode
 
 data Mode = ExtendedCtag
-		  | IgnoreCloseImpl
+          | IgnoreCloseImpl
           | ETags
           | CTags
           | BothTags
           | Append
           | OutRedir String
           | CacheFiles
+          | FollowDirectorySymLinks
           | Help
+          | HsSuffixes [String]
           deriving (Ord, Eq, Show)
 
 data Token = Token String Pos

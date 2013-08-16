@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
 module Main (main) where
 import Hasktags
 import Tags
@@ -9,6 +10,9 @@ import Data.List
 
 import System.IO
 import System.Directory
+#ifdef VERSION_unix
+import System.Posix.Files
+#endif
 import System.FilePath ((</>))
 import System.Console.GetOpt
 import System.Exit
@@ -38,8 +42,15 @@ options = [ Option "c" ["ctags"]
           , Option "x" ["extendedctag"]
             (NoArg ExtendedCtag) "Generate additional information in ctag file."
           , Option "" ["cache"] (NoArg CacheFiles) "Cache file data."
+          , Option "L" ["follow-symlinks"] (NoArg FollowDirectorySymLinks) "follow symlinks when recursing directories"
+          , Option "S" ["suffixes"] (OptArg suffStr ".hs,.lhs") "list of hs suffixes including \".\""
           , Option "h" ["help"] (NoArg Help) "This help"
           ]
+  where suffStr Nothing = HsSuffixes [ ".hs", ".lhs" ]
+        suffStr (Just s) = HsSuffixes $ strToSuffixes s
+        strToSuffixes = lines . map commaToEOL
+        commaToEOL ',' = '\n'
+        commaToEOL x = x
 
 
 main :: IO ()
@@ -50,12 +61,22 @@ main = do
                    "Usage: " ++ progName
                 ++ " [OPTION...] [files or directories...]\n"
                 ++ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs\n"
-                ++ "Thus hasktags . tags all important files in the current "
-                ++ "directory"
+                ++ "Thus hasktags . tags all important files in the current\n"
+                ++ "directory.\n"
+                ++ "\n"
+                ++ "If directories are symlinks they will not be followed\n"
+                ++ "unless you pass -L.\n"
+                ++ "\n"
+                ++ "A special file \"STDIN\" will make hasktags read the line separated file\n"
+                ++ "list to be tagged from STDIN.\n"
         let (modes, files_or_dirs, errs) = getOpt Permute options args
 
+        let hsSuffixes = head [ s | (HsSuffixes s) <- modes ]
+
+        let followSymLinks = FollowDirectorySymLinks `elem` modes
+
         filenames
-          <- liftM (nub . concat) $ mapM (dirToFiles False) files_or_dirs
+          <- liftM (nub . concat) $ mapM (dirToFiles followSymLinks hsSuffixes) files_or_dirs
 
         when (errs /= [] || elem Help modes || files_or_dirs == [])
              (do putStr $ unlines errs
@@ -92,15 +113,24 @@ main = do
                  hClose etagsfile
                  hClose ctagsfile)
 
-dirToFiles :: Bool -> FilePath -> IO [ FilePath ]
-dirToFiles hsExtOnly p = do
+-- suffixes: [".hs",".lhs"], use "" to match all files
+dirToFiles :: Bool -> [String] -> FilePath -> IO [ FilePath ]
+dirToFiles _ _ "STDIN" = fmap lines $ hGetContents stdin
+dirToFiles followSyms suffixes p = do
   isD <- doesDirectoryExist p
-  if isD then recurse p
-         else return
-           [p | not hsExtOnly || ".hs" `isSuffixOf` p || ".lhs" `isSuffixOf` p]
-  where recurse p' = do
-            names
-              <- liftM (filter ( (/= '.') . head ) ) $ getDirectoryContents p'
-                                      -- skip . .. and hidden files (linux)
-            liftM concat $ mapM (processFile . (p' </>) ) names
-        processFile = dirToFiles True
+  isSymLink <-
+#ifdef VERSION_unix
+    isSymbolicLink `fmap` getSymbolicLinkStatus p
+#else
+    return False
+#endif
+  case isD of
+    False -> return $ if matchingSuffix then [p] else []
+    True ->
+      if isSymLink && not followSyms
+        then return []
+        else do
+          -- filter . .. and hidden files .*
+          contents <- filter ((/=) '.' . head) `fmap` getDirectoryContents p
+          concat `fmap` (mapM (dirToFiles followSyms suffixes . (</>) p) contents)
+  where matchingSuffix = any (`isSuffixOf` p) suffixes
