@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 module Main (main) where
 import Hasktags
@@ -9,6 +10,9 @@ import Data.List
 
 import System.IO
 import System.Directory
+#ifdef VERSION_unix
+import System.Posix.Files
+#endif
 import System.FilePath ((</>))
 import System.Console.GetOpt
 import System.Exit
@@ -55,7 +59,7 @@ main = do
         let (modes, files_or_dirs, errs) = getOpt Permute options args
 
         filenames
-          <- liftM (nub . concat) $ mapM (dirToFiles False) files_or_dirs
+          <- liftM (nub . concat) $ mapM (dirToFiles True) files_or_dirs
 
         when (errs /= [] || elem Help modes || files_or_dirs == [])
              (do putStr $ unlines errs
@@ -93,14 +97,15 @@ main = do
                  hClose ctagsfile)
 
 dirToFiles :: Bool -> FilePath -> IO [ FilePath ]
-dirToFiles hsExtOnly p = do
+dirToFiles named p = do
   isD <- doesDirectoryExist p
-  if isD then recurse p
-         else return
-           [p | not hsExtOnly || ".hs" `isSuffixOf` p || ".lhs" `isSuffixOf` p]
-  where recurse p' = do
-            names
-              <- liftM (filter ( (/= '.') . head ) ) $ getDirectoryContents p'
-                                      -- skip . .. and hidden files (linux)
-            liftM concat $ mapM (processFile . (p' </>) ) names
-        processFile = dirToFiles True
+  case isD of
+    False -> return $ if named || isHaskell then [p] else []
+    True -> do
+#ifdef VERSION_unix
+      isL <- isSymbolicLink `fmap` getSymbolicLinkStatus p
+      if not named && isL then return [] else do
+#endif
+        contents <- filter ((/=) "." . take 1) `fmap` getDirectoryContents p
+        concat `fmap` mapM (dirToFiles False . (</>) p) contents
+  where isHaskell = any (`isSuffixOf` p) [".hs", ".lhs"]
