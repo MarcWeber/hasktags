@@ -44,7 +44,7 @@ Flag enable_caching
 
 source-repository head
   type: git
-  location: http://github.com/marcotmarcot/hasktags
+  location: http://github.com/MarcWeber/hasktags
 
 Executable hasktags
     Main-Is: Main.hs
