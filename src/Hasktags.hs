@@ -287,8 +287,9 @@ findstuff (Token "newtype" _ : ts@(Token name pos : _)) =
 findstuff (Token "type" _ : Token name pos : xs) =
         FoundThing FTType name pos : findstuff xs
 findstuff (Token "class" _ : xs) = case break ((== "where").tokenString) xs of
-        (ys,[]) -> maybeToList $ className ys
-        (_,r) -> maybe [] (:fromWhereOn r) $ className xs
+        (ys,_) -> maybeToList $ className ys
+        --- why did this branch exist, it makes test case 9 and 10 fail
+        -- (_,r) -> maybe [] (:fromWhereOn r) $ className xs
     where isParenOpen (Token "(" _) = True
           isParenOpen _ = False
           className lst
