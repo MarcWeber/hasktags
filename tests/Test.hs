@@ -36,7 +36,7 @@ tagComments lns comment
 testToBeFound :: [String] -> [String] -> Test
 testToBeFound foundTagNames toBeFound =
         "these were not found"
-        ~: [] ~=? filter (not . (`elem` foundTagNames)) toBeFound
+        ~: [] ~?= filter (not . (`elem` foundTagNames)) toBeFound
 
 testNotToBeFound :: [String] -> [String] -> Test
 testNotToBeFound foundTagNames notToBeFound =

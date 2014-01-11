@@ -18,25 +18,28 @@ cabal-version: >=1.10
 extra-source-files:
   README,
   TODO,
-  testcases/test.sh,
-  testcases/1/testcase.hs,
-  testcases/2/testcase2.hs,
-  testcases/3/testcase3.lhs,
-  testcases/4/testcase4.hs,
-  testcases/5/HUnitBase.lhs,
-  testcases/6/Repair.lhs,
-  testcases/7/constructor.hs,
-  testcases/8/test_case.hs,
-  testcases/9/blockcomment.hs,
-  testcases/10/twoblockcommentshs.hs,
-  testcases/11/twoblockcommentslhs.lhs,
-  testcases/12/twoblockcommentstogether.hs,
-  testcases/13/typesig.hs,
-  testcases/14/module.hs,
-  testcases/15/space.hs,
-  testcases/16/firstconstructor.hs,
-  testcases/17/substring.hs,
-  testcases/18/tabs.hs
+  testcases/HUnitBase.lhs
+  testcases/Repair.lhs
+  testcases/blockcomment.hs
+  testcases/constructor.hs
+  testcases/firstconstructor.hs
+  testcases/module.hs
+  testcases/space.hs
+  testcases/substring.hs
+  testcases/tabs.hs
+  testcases/testcase1.hs
+  testcases/testcase2.hs
+  testcases/testcase3.lhs
+  testcases/testcase4.hs
+  testcases/testcase8.hs
+  testcases/twoblockcommentshs.hs
+  testcases/twoblockcommentslhs.lhs
+  testcases/twoblockcommentstogether.hs
+  testcases/typesig.hs
+  testcases/expected_failures_testing_suite.hs
+  testcases/testcase9.hs
+  testcases/testcase10.hs
+
 
 -- TODO finish implementation
 Flag enable_caching
