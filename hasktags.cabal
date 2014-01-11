@@ -39,6 +39,7 @@ extra-source-files:
   testcases/expected_failures_testing_suite.hs
   testcases/testcase9.hs
   testcases/testcase10.hs
+  testcases/testcase11.hs
 
 
 -- TODO finish implementation
