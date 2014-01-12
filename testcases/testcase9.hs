@@ -1,6 +1,10 @@
 \section[GHC.Base]{Module @GHC.Base@}
 
+!!! This test case also tests the getTopLevelIndent implementation, because it
+has the word "import" as comment !!!
+
 -- to be found Monad
+
 
 The overall structure of the GHC Prelude is a bit tricky.
 

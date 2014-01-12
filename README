@@ -53,6 +53,12 @@ Things which could be done in the future:
 
 maintainers: See cabal file
 
+
+comments about literate haskell (lhs):
+=======================================
+http://www.haskell.org/haskellwiki/Literate_programming
+alex no longer supports bird style ">", so should we drop support, too?
+
 contributors:
   Tsuru Capital (github/liyang)
   Marco Túlio Pimenta Gontijo (github/marcotmarcot)

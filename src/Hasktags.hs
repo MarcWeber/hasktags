@@ -24,8 +24,8 @@ import System.IO
 import System.Directory
 import Text.JSON.Generic
 import Control.Monad
---import Debug.Trace
 
+import DebugShow
 
 -- search for definitions of things
 -- we do this by looking for the following patterns:
@@ -165,18 +165,26 @@ findThingsInBS ignoreCloseImpl filename bs = do
                   cppLine _ = False
                 in filter (not . emptyLine) . filter (not . cppLine)
 
+        let debugStep m = (\s -> trace_ (m ++ " result") s s)
+
+        let (isLiterate, slines) =
+              debugStep "fromLiterate"
+              $ fromLiterate filename
+              $ zip aslines [0..]
+
         --  remove -- comments, then break each line into tokens (adding line
         --  numbers)
         --  then remove {- -} comments
         --  split by lines again ( to get indent
         let
           (fileLines, numbers)
-            = unzip . fromLiterate filename $ zip aslines [0..]
-        let tokenLines =
-                      stripNonHaskellLines
-                      $ stripslcomments
-                      $ splitByNL Nothing
-                      $ stripblockcomments
+            = unzip slines
+
+        let tokenLines {- :: [[Token]] -} =
+                        debugStep "stripNonHaskellLines" $ stripNonHaskellLines
+                      $ debugStep "stripslcomments" $ stripslcomments
+                      $ debugStep "splitByNL" $ splitByNL Nothing
+                      $ debugStep "stripblockcomments pipe" $ stripblockcomments
                       $ concat
                       $ zipWith3 (withline filename)
                                  (map
@@ -193,10 +201,11 @@ findThingsInBS ignoreCloseImpl filename bs = do
         -- let x = 7
         --     z = 20
         -- won't be found as function
+        let topLevelIndent = debugStep "top level indent" $ getTopLevelIndent isLiterate tokenLines
         let sections = map tail -- strip leading NL (no longer needed
                        $ filter (not . null)
-                       $ splitByNL (Just (getTopLevelIndent tokenLines) )
-                       $ concat tokenLines
+                       $ splitByNL (Just (topLevelIndent) )
+                       $ concat (trace_ "tokenLines" tokenLines tokenLines)
         -- only take one of
         -- a 'x' = 7
         -- a _ = 0
@@ -214,7 +223,7 @@ findThingsInBS ignoreCloseImpl filename bs = do
                            && n1 == n2
                            && ((<= 7) $ abs $ l2 - l1))
               else id
-        let things = iCI $ filterAdjacentFuncImpl $ concatMap findstuff sections
+        let things = iCI $ filterAdjacentFuncImpl $ concatMap findstuff $ map (\s -> trace_ "section in findThingsInBS" s s) sections
         let
           -- If there's a module with the same name of another definition, we
           -- are not interested in the module, but only in the definition.
@@ -244,21 +253,30 @@ stripslcomments = let f (NewLine _ : Token "--" _ : _) = False
                   in filter f
 
 stripblockcomments :: [Token] -> [Token]
-stripblockcomments (Token "\\end{code}" _ : xs) = afterlitend xs
-stripblockcomments (Token "{-" _ : xs) = afterblockcomend xs
+stripblockcomments (Token "\\end{code}" pos : xs) =
+  trace_ "stripblockcomments end{code} found at " (show pos) $
+  afterlitend xs
+stripblockcomments (Token "{-" pos : xs) =
+  trace_ "{- found at " (show pos) $
+  afterblockcomend xs
 stripblockcomments (x:xs) = x:stripblockcomments xs
 stripblockcomments [] = []
 
 afterlitend :: [Token] -> [Token]
-afterlitend (Token "\\begin{code}" _ : xs) = stripblockcomments xs
+afterlitend (Token "\\begin{code}" pos : xs) = 
+  trace_ "stripblockcomments begin{code} found at " (show pos) $
+  stripblockcomments xs
 afterlitend (_ : xs) = afterlitend xs
 afterlitend [] = []
 
 afterblockcomend :: [Token] -> [Token]
-afterblockcomend (t:xs)
- | contains "-}" (tokenString t) = stripblockcomments xs
+afterblockcomend (t@(Token _ pos):xs)
+ | contains "-}" (tokenString t) =
+   trace_ "-} found at " (show pos) $
+   stripblockcomments xs
  | otherwise           = afterblockcomend xs
 afterblockcomend [] = []
+afterblockcomend (_:xs) = afterblockcomend xs
 
 
 -- does one string contain another string
@@ -270,27 +288,37 @@ contains sub = any (isPrefixOf sub) . tails
 
 findstuff :: [Token] -> [FoundThing]
 findstuff (Token "module" _ : Token name pos : _) =
+        trace_ "module" pos $
         [FoundThing FTModule name pos] -- nothing will follow this section
-findstuff (Token "data" _ : Token name pos : xs)
+findstuff tokens@(Token "data" _ : Token name pos : xs)
         | any ( (== "where"). tokenString ) xs -- GADT
             -- TODO will be found as FTCons (not FTConsGADT), the same for
             -- functions - but they are found :)
-            = FoundThing FTDataGADT name pos
+            =
+              trace_  "findstuff data b1" tokens $
+              FoundThing FTDataGADT name pos
               : getcons2 xs ++ fromWhereOn xs -- ++ (findstuff xs)
         | otherwise
-            = FoundThing FTData name pos
+            =
+              trace_  "findstuff data otherwise" tokens $
+              FoundThing FTData name pos
               : getcons FTData (trimNewlines xs)-- ++ (findstuff xs)
-findstuff (Token "newtype" _ : ts@(Token name pos : _)) =
+findstuff tokens@(Token "newtype" _ : ts@(Token name pos : _)) =
+        trace_ "findstuff newtype" tokens $
         FoundThing FTNewtype name pos
           : getcons FTCons (trimNewlines ts)-- ++ (findstuff xs)
         -- FoundThing FTNewtype name pos : findstuff xs
-findstuff (Token "type" _ : Token name pos : xs) =
+findstuff tokens@(Token "type" _ : Token name pos : xs) =
+        trace_  "findstuff type" tokens $
         FoundThing FTType name pos : findstuff xs
-findstuff (Token "class" _ : xs) = 
-        let x = break ((== "where").tokenString) xs in
-        case (traceShow x x) of
-        (ys, []) -> maybeToList $ className ys
+findstuff tokens@(Token "class" _ : xs) =
+        trace_  "findstuff class" tokens $
+        case (break ((== "where").tokenString) xs) of
+        (ys, []) ->
+          trace_ "findstuff class b1 " ys $
+          maybeToList $ className ys
         (ys, r) ->
+          trace_ "findstuff class b2 " (ys, r) $
              (maybeToList $ className ys)
           ++ (maybe [] (:fromWhereOn r) $ className xs)
     where isParenOpen (Token "(" _) = True
@@ -303,7 +331,9 @@ findstuff (Token "class" _ : xs) =
                   . reverse) lst of
               (Token name p) -> Just $ FoundThing FTClass name p
               _ -> Nothing
-findstuff xs = findFunc xs ++ findFuncTypeDefs [] xs
+findstuff xs =
+  trace_ "findstuff rest " xs $
+  findFunc xs ++ findFuncTypeDefs [] xs
 
 findFuncTypeDefs :: [Token] -> [Token] -> [FoundThing]
 findFuncTypeDefs found (t@(Token _ _): Token "," _ :xs) =
@@ -379,22 +409,26 @@ splitByNL maybeIndent (nl@(NewLine _):ts) =
   in (nl : a) : splitByNL maybeIndent b
 splitByNL _ _ = []
 
-getTopLevelIndent :: [[Token]] -> Int
-getTopLevelIndent [] = 0 -- (no import found , assuming indent 0 : this can be
+-- this only exists for test case testcases/HUnitBase.lhs (bird literate haskell style)
+getTopLevelIndent :: Bool -> [[Token]] -> Int
+getTopLevelIndent isLiterate [] = 0 -- (no import found , assuming indent 0 : this can be
                          -- done better but should suffice for most needs
-getTopLevelIndent (x:xs) = if any ((=="import") . tokenString) x
-                          then let (NewLine i : _) = x in i
-                          else getTopLevelIndent xs
+getTopLevelIndent isLiterate ((nl:next:rest):xs) = if "import" == (tokenString next)
+                          then let (NewLine i) = nl in i
+                          else getTopLevelIndent isLiterate xs
+getTopLevelIndent isLiterate (_:xs) = getTopLevelIndent isLiterate xs
 
 -- removes literate stuff if any line '> ... ' is found and any word is \begin
--- (hglogger has ^> in it's commetns)
-fromLiterate :: FilePath -> [(String, Int)] -> [(String, Int)]
+-- (hglogger has ^> in it's comments)
+fromLiterate :: FilePath -> [(String, Int)] 
+    -> (Bool -- is literate
+    , [(String, Int)])
 fromLiterate file lns =
   let literate = [ (ls, n) |  ('>':ls, n) <- lns ]
  -- not . null literate because of Repair.lhs of darcs
-  in if ".lhs" `isSuffixOf` file && (not . null $ literate) then literate
+  in if ".lhs" `isSuffixOf` file && (not . null $ literate) then (True, literate)
       else if (".hs" `isSuffixOf` file)
             || (null literate
             || not ( any ( any ("\\begin" `isPrefixOf`). words . fst) lns))
-        then lns
-        else literate
+        then (False, lns)
+        else (True, literate)
