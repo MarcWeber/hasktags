@@ -1,5 +1,5 @@
 Name: hasktags
-Version: 0.68.3
+Version: 0.68.4
 Copyright: The University Court of the University of Glasgow
 License: BSD3
 License-File: LICENSE
@@ -60,8 +60,8 @@ Executable hasktags
       bytestring >= 0.9 && < 0.11,
       directory >= 1.1 && < 1.3,
       filepath,
-      json >= 0.5 && < 0.8
-    other-modules: Tags, Hasktags
+      json >= 0.5 && < 0.8,
+    other-modules: Tags, Hasktags, DebugShow
     hs-source-dirs: src
     ghc-options: -Wall
     default-language: Haskell2010
