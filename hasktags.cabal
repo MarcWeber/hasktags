@@ -41,13 +41,9 @@ extra-source-files:
   testcases/testcase10.hs
   testcases/testcase11.hs
 
-
--- TODO finish implementation
-Flag enable_caching
-  Default: True
-
 Flag debug
   Default: False
+  Description: When set to true tokens will be print at various places. This helps understanding why hasktags does not behave the w ay it should
 
 source-repository head
   type: git
