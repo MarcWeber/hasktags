@@ -18,6 +18,8 @@ import System.Console.GetOpt
 import System.Exit
 import Control.Monad
 
+hsSuffixesDefault =  HsSuffixes [ ".hs", ".lhs" ]
+
 options :: [OptDescr Mode]
 options = [ Option "c" ["ctags"]
             (NoArg CTags) "generate CTAGS file (ctags)"
@@ -46,7 +48,7 @@ options = [ Option "c" ["ctags"]
           , Option "S" ["suffixes"] (OptArg suffStr ".hs,.lhs") "list of hs suffixes including \".\""
           , Option "h" ["help"] (NoArg Help) "This help"
           ]
-  where suffStr Nothing = HsSuffixes [ ".hs", ".lhs" ]
+  where suffStr Nothing = hsSuffixesDefault
         suffStr (Just s) = HsSuffixes $ strToSuffixes s
         strToSuffixes = lines . map commaToEOL
         commaToEOL ',' = '\n'
@@ -70,8 +72,11 @@ main = do
                 ++ "A special file \"STDIN\" will make hasktags read the line separated file\n"
                 ++ "list to be tagged from STDIN.\n"
         let (modes, files_or_dirs, errs) = getOpt Permute options args
+#if debug
+        print $ "modes: " ++ (show modes)
+#endif
 
-        let hsSuffixes = head [ s | (HsSuffixes s) <- modes ]
+        let hsSuffixes = head $ [ s | (HsSuffixes s) <- modes ++ [hsSuffixesDefault] ]
 
         let followSymLinks = FollowDirectorySymLinks `elem` modes
 
