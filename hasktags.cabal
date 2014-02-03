@@ -1,5 +1,5 @@
 Name: hasktags
-Version: 0.68.6
+Version: 0.68.7
 Copyright: The University Court of the University of Glasgow
 License: BSD3
 License-File: LICENSE
@@ -41,6 +41,7 @@ extra-source-files:
   testcases/testcase10.hs
   testcases/testcase11.hs
   testcases/simple.hs
+  testcases/monad-base-control.hs
 
 Flag debug
   Default: False
@@ -53,6 +54,7 @@ source-repository head
 Executable hasktags
     Main-Is: Main.hs
     Build-Depends:
+      utf8-string,
       base >= 4 && < 5,
       bytestring >= 0.9 && < 0.11,
       directory >= 1.1 && < 1.3,

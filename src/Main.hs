@@ -18,6 +18,7 @@ import System.Console.GetOpt
 import System.Exit
 import Control.Monad
 
+hsSuffixesDefault :: Mode
 hsSuffixesDefault =  HsSuffixes [ ".hs", ".lhs" ]
 
 options :: [OptDescr Mode]

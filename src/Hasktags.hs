@@ -16,6 +16,9 @@ import Tags
 
 -- the lib
 import qualified Data.ByteString.Char8 as BS
+
+import qualified Data.ByteString.UTF8 as BS8 -- see notes at utf8_to_char8_hack
+
 import Data.Char
 import Data.List
 import Data.Maybe
@@ -148,6 +151,14 @@ findWithCache cache ignoreCloseImpl filename = do
           filedata <- findThings ignoreCloseImpl filename
           when cache (writeFile cacheFilename (encodeJSON filedata))
           return filedata
+
+-- eg Data.Text says that using ByteStrings could be fastest depending on ghc
+-- platform and whatnot - so let's keep the hacky BS.readFile >>= BS.unpack
+-- usage till there is a problem, still need to match utf-8 chars like this: ⇒
+-- to get correct class names, eg MonadBaseControl case (testcase testcases/monad-base-control.hs)
+-- so use the same conversion which is applied to files when they got read ..
+utf8_to_char8_hack :: String -> String
+utf8_to_char8_hack = BS.unpack . BS8.fromString
 
 -- Find the definitions in a file
 findThings :: Bool -> FileName -> IO FileData
@@ -327,7 +338,7 @@ findstuff tokens@(Token "class" _ : xs) =
             = case (head
                   . dropWhile isParenOpen
                   . reverse
-                  . takeWhile ((/= "=>") . tokenString)
+                  . takeWhile ((not . (`elem` ["=>", utf8_to_char8_hack "⇒"])) . tokenString)
                   . reverse) lst of
               (Token name p) -> Just $ FoundThing FTClass name p
               _ -> Nothing
@@ -411,9 +422,9 @@ splitByNL _ _ = []
 
 -- this only exists for test case testcases/HUnitBase.lhs (bird literate haskell style)
 getTopLevelIndent :: Bool -> [[Token]] -> Int
-getTopLevelIndent isLiterate [] = 0 -- (no import found , assuming indent 0 : this can be
+getTopLevelIndent _ [] = 0 -- (no import found , assuming indent 0 : this can be
                          -- done better but should suffice for most needs
-getTopLevelIndent isLiterate ((nl:next:rest):xs) = if "import" == (tokenString next)
+getTopLevelIndent isLiterate ((nl:next:_):xs) = if "import" == (tokenString next)
                           then let (NewLine i) = nl in i
                           else getTopLevelIndent isLiterate xs
 getTopLevelIndent isLiterate (_:xs) = getTopLevelIndent isLiterate xs
