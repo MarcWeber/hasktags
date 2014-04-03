@@ -47,6 +47,7 @@ options = [ Option "c" ["ctags"]
           , Option "" ["cache"] (NoArg CacheFiles) "Cache file data."
           , Option "L" ["follow-symlinks"] (NoArg FollowDirectorySymLinks) "follow symlinks when recursing directories"
           , Option "S" ["suffixes"] (OptArg suffStr ".hs,.lhs") "list of hs suffixes including \".\""
+          , Option "R" ["tags-absolute"] (NoArg AbsolutePath) "make tags paths absolute. Useful when setting tags files in other directories"
           , Option "h" ["help"] (NoArg Help) "This help"
           ]
   where suffStr Nothing = hsSuffixesDefault
@@ -72,11 +73,14 @@ main = do
                 ++ "\n"
                 ++ "A special file \"STDIN\" will make hasktags read the line separated file\n"
                 ++ "list to be tagged from STDIN.\n"
-        let (modes, files_or_dirs, errs) = getOpt Permute options args
+        let (modes, files_or_dirs_unexpanded, errs) = getOpt Permute options args
 #if debug
         print $ "modes: " ++ (show modes)
 #endif
 
+        files_or_dirs <- if AbsolutePath `elem` modes
+                             then sequence $ map canonicalizePath files_or_dirs_unexpanded
+                             else return files_or_dirs_unexpanded
         let hsSuffixes = head $ [ s | (HsSuffixes s) <- modes ++ [hsSuffixesDefault] ]
 
         let followSymLinks = FollowDirectorySymLinks `elem` modes

@@ -109,6 +109,7 @@ data Mode = ExtendedCtag
           | FollowDirectorySymLinks
           | Help
           | HsSuffixes [String]
+          | AbsolutePath
           deriving (Ord, Eq, Show)
 
 data Token = Token String Pos
