@@ -265,21 +265,11 @@ stripslcomments = let f (NewLine _ : Token "--" _ : _) = False
                   in filter f
 
 stripblockcomments :: [Token] -> [Token]
-stripblockcomments (Token "\\end{code}" pos : xs) =
-  trace_ "stripblockcomments end{code} found at " (show pos) $
-  afterlitend xs
 stripblockcomments (Token "{-" pos : xs) =
   trace_ "{- found at " (show pos) $
   afterblockcomend xs
 stripblockcomments (x:xs) = x:stripblockcomments xs
 stripblockcomments [] = []
-
-afterlitend :: [Token] -> [Token]
-afterlitend (Token "\\begin{code}" pos : xs) = 
-  trace_ "stripblockcomments begin{code} found at " (show pos) $
-  stripblockcomments xs
-afterlitend (_ : xs) = afterlitend xs
-afterlitend [] = []
 
 afterblockcomend :: [Token] -> [Token]
 afterblockcomend (t@(Token _ pos):xs)
@@ -430,17 +420,27 @@ getTopLevelIndent isLiterate ((nl:next:_):xs) = if "import" == (tokenString next
                           else getTopLevelIndent isLiterate xs
 getTopLevelIndent isLiterate (_:xs) = getTopLevelIndent isLiterate xs
 
--- removes literate stuff if any line '> ... ' is found and any word is \begin
--- (hglogger has ^> in it's comments)
+-- According to http://www.haskell.org/onlinereport/literate.html either
+-- birdstyle or LaTeX style should be used. However simple experiments show
+-- that unlit distributed by GHC has the following behavior
+-- * The space after ">" can be omitted
+-- * ">" must be first char in line to be read as birdstyle (then its replaced by a space)
+-- * \begin{code} gets recognized if its indented, but \end{code} does not (?)
+--
+-- Attention: Base.lhs (shipping with GHC) have birdstyle in block comments
 fromLiterate :: FilePath -> [(String, Int)] 
     -> (Bool -- is literate
     , [(String, Int)])
 fromLiterate file lns =
-  let literate = [ (ls, n) |  ('>':ls, n) <- lns ]
- -- not . null literate because of Repair.lhs of darcs
-  in if ".lhs" `isSuffixOf` file && (not . null $ literate) then (True, literate)
-      else if (".hs" `isSuffixOf` file)
-            || (null literate
-            || not ( any ( any ("\\begin" `isPrefixOf`). words . fst) lns))
-        then (False, lns)
-        else (True, literate)
+  if ".lhs" `isSuffixOf` file
+    then (True, unlit lns)
+    else (False, lns)
+
+  where unlit, returnCode :: [(String, Int)] -> [(String, Int)]
+        unlit ((('>':' ':xs),n):ns) = ((' ':xs),n):unlit(ns) -- unlit keeps space, so do we
+        unlit ((line,_):ns) = if "\\begin{code}" `isPrefixOf` line then returnCode ns else unlit ns
+        unlit [] = []
+
+        -- in \begin{code} block
+        returnCode (t@(line,_):ns) = if "\\end{code}" `isPrefixOf` line then unlit ns else t:(returnCode ns)
+        returnCode [] = [] -- unexpected - hasktags does tagging, not compiling, thus don't treat missing \end{code} to be an error
