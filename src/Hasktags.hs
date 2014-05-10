@@ -2,6 +2,7 @@
 -- should this be named Data.Hasktags or such?
 module Hasktags (
   FileData,
+  generate,
   findWithCache,
   findThings,
   findThingsInBS,
@@ -131,6 +132,37 @@ isNewLine _ _ = False
 
 trimNewlines :: [Token] -> [Token]
 trimNewlines = filter (not . isNewLine Nothing)
+
+generate :: [Mode] -> [FileName] -> IO ()
+generate modes filenames = do
+
+  let mode = getMode (filter ( `elem` [BothTags, CTags, ETags] ) modes)
+      openFileMode = if Append `elem` modes
+                     then AppendMode
+                     else WriteMode
+  filedata <- mapM (findWithCache (CacheFiles `elem` modes)
+                                  (IgnoreCloseImpl `elem` modes))
+                   filenames
+
+  when (mode == CTags)
+       (do ctagsfile <- getOutFile "tags" openFileMode modes
+           writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
+           hClose ctagsfile)
+
+  when (mode == ETags)
+       (do etagsfile <- getOutFile "TAGS" openFileMode modes
+           writeetagsfile etagsfile filedata
+           hClose etagsfile)
+
+  -- avoid problem when both is used in combination
+  -- with redirection on stdout
+  when (mode == BothTags)
+       (do etagsfile <- getOutFile "TAGS" openFileMode modes
+           writeetagsfile etagsfile filedata
+           ctagsfile <- getOutFile "tags" openFileMode modes
+           writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
+           hClose etagsfile
+           hClose ctagsfile)
 
 -- Find the definitions in a file, or load from cache if the file
 -- hasn't changed since last time.
@@ -428,7 +460,7 @@ getTopLevelIndent isLiterate (_:xs) = getTopLevelIndent isLiterate xs
 -- * \begin{code} gets recognized if its indented, but \end{code} does not (?)
 --
 -- Attention: Base.lhs (shipping with GHC) have birdstyle in block comments
-fromLiterate :: FilePath -> [(String, Int)] 
+fromLiterate :: FilePath -> [(String, Int)]
     -> (Bool -- is literate
     , [(String, Int)])
 fromLiterate file lns =

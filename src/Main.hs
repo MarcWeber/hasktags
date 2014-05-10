@@ -2,7 +2,6 @@
 {-# LANGUAGE CPP #-}
 module Main (main) where
 import Hasktags
-import Tags
 
 import System.Environment
 
@@ -95,33 +94,7 @@ main = do
 
         when (filenames == []) $ putStrLn "warning: no files found!"
 
-        let mode = getMode (filter ( `elem` [BothTags, CTags, ETags] ) modes)
-            openFileMode = if Append `elem` modes
-                           then AppendMode
-                           else WriteMode
-        filedata <- mapM (findWithCache (CacheFiles `elem` modes)
-                                        (IgnoreCloseImpl `elem` modes))
-                         filenames
-
-        when (mode == CTags)
-             (do ctagsfile <- getOutFile "tags" openFileMode modes
-                 writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
-                 hClose ctagsfile)
-
-        when (mode == ETags)
-             (do etagsfile <- getOutFile "TAGS" openFileMode modes
-                 writeetagsfile etagsfile filedata
-                 hClose etagsfile)
-
-        -- avoid problem when both is used in combination
-        -- with redirection on stdout
-        when (mode == BothTags)
-             (do etagsfile <- getOutFile "TAGS" openFileMode modes
-                 writeetagsfile etagsfile filedata
-                 ctagsfile <- getOutFile "tags" openFileMode modes
-                 writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
-                 hClose etagsfile
-                 hClose ctagsfile)
+        generate modes filenames
 
 -- suffixes: [".hs",".lhs"], use "" to match all files
 dirToFiles :: Bool -> [String] -> FilePath -> IO [ FilePath ]
