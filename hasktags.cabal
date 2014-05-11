@@ -65,6 +65,9 @@ library
     filepath,
     json >= 0.5 && < 0.8
 
+  if !os(windows)
+    build-depends: unix
+
 Executable hasktags
     Main-Is: src/Main.hs
     Build-Depends:

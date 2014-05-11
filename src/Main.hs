@@ -9,10 +9,6 @@ import Data.List
 
 import System.IO
 import System.Directory
-#ifdef VERSION_unix
-import System.Posix.Files
-#endif
-import System.FilePath ((</>))
 import System.Console.GetOpt
 import System.Exit
 import Control.Monad
@@ -95,25 +91,3 @@ main = do
         when (filenames == []) $ putStrLn "warning: no files found!"
 
         generate modes filenames
-
--- suffixes: [".hs",".lhs"], use "" to match all files
-dirToFiles :: Bool -> [String] -> FilePath -> IO [ FilePath ]
-dirToFiles _ _ "STDIN" = fmap lines $ hGetContents stdin
-dirToFiles followSyms suffixes p = do
-  isD <- doesDirectoryExist p
-  isSymLink <-
-#ifdef VERSION_unix
-    isSymbolicLink `fmap` getSymbolicLinkStatus p
-#else
-    return False
-#endif
-  case isD of
-    False -> return $ if matchingSuffix then [p] else []
-    True ->
-      if isSymLink && not followSyms
-        then return []
-        else do
-          -- filter . .. and hidden files .*
-          contents <- filter ((/=) '.' . head) `fmap` getDirectoryContents p
-          concat `fmap` (mapM (dirToFiles followSyms suffixes . (</>) p) contents)
-  where matchingSuffix = any (`isSuffixOf` p) suffixes

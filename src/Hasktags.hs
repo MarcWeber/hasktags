@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
 -- should this be named Data.Hasktags or such?
 module Hasktags (
   FileData,
@@ -10,7 +11,9 @@ module Hasktags (
   Mode(..),
   --  TODO think about these: Must they be exported ?
   getMode,
-  getOutFile
+  getOutFile,
+
+  dirToFiles
 ) where
 
 import Tags
@@ -30,6 +33,11 @@ import Text.JSON.Generic
 import Control.Monad
 
 import DebugShow
+
+#ifdef VERSION_unix
+import System.Posix.Files
+#endif
+import System.FilePath ((</>))
 
 -- search for definitions of things
 -- we do this by looking for the following patterns:
@@ -476,3 +484,25 @@ fromLiterate file lns =
         -- in \begin{code} block
         returnCode (t@(line,_):ns) = if "\\end{code}" `isPrefixOf` line then unlit ns else t:(returnCode ns)
         returnCode [] = [] -- unexpected - hasktags does tagging, not compiling, thus don't treat missing \end{code} to be an error
+
+-- suffixes: [".hs",".lhs"], use "" to match all files
+dirToFiles :: Bool -> [String] -> FilePath -> IO [ FilePath ]
+dirToFiles _ _ "STDIN" = fmap lines $ hGetContents stdin
+dirToFiles followSyms suffixes p = do
+  isD <- doesDirectoryExist p
+  isSymLink <-
+#ifdef VERSION_unix
+    isSymbolicLink `fmap` getSymbolicLinkStatus p
+#else
+    return False
+#endif
+  case isD of
+    False -> return $ if matchingSuffix then [p] else []
+    True ->
+      if isSymLink && not followSyms
+        then return []
+        else do
+          -- filter . .. and hidden files .*
+          contents <- filter ((/=) '.' . head) `fmap` getDirectoryContents p
+          concat `fmap` (mapM (dirToFiles followSyms suffixes . (</>) p) contents)
+  where matchingSuffix = any (`isSuffixOf` p) suffixes
