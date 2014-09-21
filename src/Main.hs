@@ -14,7 +14,7 @@ import System.Exit
 import Control.Monad
 
 hsSuffixesDefault :: Mode
-hsSuffixesDefault =  HsSuffixes [ ".hs", ".lhs" ]
+hsSuffixesDefault =  HsSuffixes [ ".hs", ".lhs", ".hsc" ]
 
 options :: [OptDescr Mode]
 options = [ Option "c" ["ctags"]
