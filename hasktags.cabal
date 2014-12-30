@@ -1,5 +1,5 @@
 Name: hasktags
-Version: 0.69.0
+Version: 0.69.1
 Copyright: The University Court of the University of Glasgow
 License: BSD3
 License-File: LICENSE
@@ -63,7 +63,7 @@ library
     bytestring >= 0.9 && < 0.11,
     directory >= 1.1 && < 1.3,
     filepath,
-    json >= 0.5 && < 0.8
+    json >= 0.5 && < 0.10
 
   if !os(windows)
     build-depends: unix
