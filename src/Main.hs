@@ -25,11 +25,11 @@ options = [ Option "c" ["ctags"]
             (NoArg BothTags) "generate both CTAGS and ETAGS"
           , Option "a" ["append"]
               (NoArg Append)
-            $ "append to existing CTAGS and/or ETAGS file(s). After this file "
-              ++ "will no longer be sorted!"
+            $ "append to existing CTAGS and/or ETAGS file(s). Afterward this "
+              ++ "file will no longer be sorted!"
           , Option "" ["ignore-close-implementation"]
               (NoArg IgnoreCloseImpl)
-            $ "ignores found implementation if its closer than 7 lines  - so "
+            $ "ignores found implementation if it is closer than 7 lines - so "
               ++ "you can jump to definition in one shot"
           , Option "o" ["output"]
             (ReqArg OutRedir "")

@@ -89,14 +89,14 @@ Really not a easy question - maybe there is an answer - I don't know
 -- Reference: http://ctags.sourceforge.net/FORMAT
 
 
--- | getMode takes a list of modes and extract the mode with the
+-- | getMode takes a list of modes and extracts the mode with the
 --   highest precedence.  These are as follows: Both, CTags, ETags
 --   The default case is Both.
 getMode :: [Mode] -> Mode
 getMode [] = BothTags
 getMode xs = maximum xs
 
--- | getOutFile scan the modes searching for output redirection
+-- | getOutFile scans the modes searching for output redirection
 --   if not found, open the file with name passed as parameter.
 --   Handle special file -, which is stdout
 getOutFile :: String -> IOMode -> [Mode] -> IO Handle
@@ -453,8 +453,8 @@ splitByNL _ _ = []
 
 -- this only exists for test case testcases/HUnitBase.lhs (bird literate haskell style)
 getTopLevelIndent :: Bool -> [[Token]] -> Int
-getTopLevelIndent _ [] = 0 -- (no import found , assuming indent 0 : this can be
-                         -- done better but should suffice for most needs
+getTopLevelIndent _ [] = 0 -- (no import found, assuming indent 0: this can be
+                           -- done better but should suffice for most needs
 getTopLevelIndent isLiterate ((nl:next:_):xs) = if "import" == (tokenString next)
                           then let (NewLine i) = nl in i
                           else getTopLevelIndent isLiterate xs

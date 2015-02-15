@@ -15,8 +15,8 @@ I haven't applied the patch yet for several reasons:
   https://github.com/MarcWeber/SmartTag
 - He stopped replying while me asking whether I should change to git
   so that multiple branches can coexist at the same time easily.
-- the speed improvement maybe can be done in a differetn way using Maps instead
-  of lists so that no sorting or nubyBy has to take place at all
+- the speed improvement maybe can be done in a different way using Maps instead
+  of lists so that no sorting or nubBy has to take place at all
 
 Vote for the patch or the feature to make me include it.
 Vote for me changing to git or tell me if there is a nicer way to distribute an
