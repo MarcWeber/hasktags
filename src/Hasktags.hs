@@ -304,6 +304,15 @@ stripslcomments = let f (NewLine _ : Token "--" _ : _) = False
                       f _ = True
                   in filter f
 
+stripendoflinecomments :: [Token] -> [Token]
+stripendoflinecomments = go [] False
+    where
+        go acc _ (Token "--" _ : xs) = go acc True xs
+        go acc _ (nl@(NewLine _ ): xs) = go (nl:acc) False xs
+        go acc True (_:xs) = go acc True xs
+        go acc False (t:xs) = go (t:acc) False xs
+        go acc _ [] = reverse acc
+
 stripblockcomments :: [Token] -> [Token]
 stripblockcomments (Token "{-" pos : xs) =
   trace_ "{- found at " (show pos) $
@@ -326,12 +335,20 @@ nosig = ""
 noscope :: Scope
 noscope = ""
 
-wrapInParens :: String -> String
-wrapInParens s = "(" ++ s ++ ")"
+-- | Appending :: <sig> would be more idiomatic, but Tagbar has
+-- special highlighting for things in parens.
+-- Maybe open an issue for Tagbar to support this?
+decorateSignature :: String -> String
+decorateSignature s = if null s then s else "(" ++ s ++ ")"
 
 -- | TODO don't leave space after/before parens, etc.
 concatTokensForSig :: [Token] -> String
 concatTokensForSig = intercalate " " . map tokenString . trimNewlines
+
+-- | Strips newlines (to make ctor finding logic simpler), and
+-- removes comments (to make signature extraction simpler).
+cleanupCons :: [Token] -> [Token]
+cleanupCons = trimNewlines . stripblockcomments . stripendoflinecomments
 
 -- does one string contain another string
 
@@ -356,11 +373,11 @@ findstuff tokens@(Token "data" _ : Token name pos : xs)
             =
               trace_  "findstuff data otherwise" tokens $
               FoundThing FTData name pos nosig noscope
-              : getcons ("data:" ++ name) FTCons (trimNewlines xs)-- ++ (findstuff xs)
+              : getcons ("data:" ++ name) FTCons (cleanupCons xs)  -- ++ (findstuff xs)
 findstuff tokens@(Token "newtype" _ : ts@(Token name pos : _)) =
         trace_ "findstuff newtype" tokens $
         FoundThing FTNewtype name pos nosig noscope
-          : getcons noscope FTCons (trimNewlines ts)-- ++ (findstuff xs)
+          : getcons noscope FTCons (cleanupCons ts)  -- ++ (findstuff xs)
         -- FoundThing FTNewtype name pos : findstuff xs
 findstuff tokens@(Token "type" _ : Token name pos : xs) =
         trace_  "findstuff type" tokens $
@@ -394,7 +411,7 @@ findFuncTypeDefs found (t@(Token _ _): Token "," _ :xs) =
           findFuncTypeDefs (t : found) xs
 findFuncTypeDefs found (t@(Token _ _): Token "::" _ :xs) =
           map (\(Token name p) -> FoundThing FTFuncTypeDef name p (funSig xs) noscope) (t:found)
-    where funSig = wrapInParens . concatTokensForSig
+    where funSig = decorateSignature . concatTokensForSig
 findFuncTypeDefs found (Token "(" _ :xs) =
           case break myBreakF xs of
             (inner@(Token _ p : _), _:xs') ->
@@ -432,7 +449,8 @@ findInfix x
 
 findF :: [Token] -> [FoundThing]
 findF (Token name p : xs) =
-    [FoundThing FTFuncImpl name p nosig noscope | any (("=" ==) . tokenString) xs]
+    [FoundThing FTFuncImpl name p nosig noscope
+        | any (("=" ==) . tokenString) xs]
 findF _ = []
 
 tail' :: [a] -> [a]
@@ -443,20 +461,32 @@ tail' [] = []
 
 getcons :: Scope -> FoundThingType -> [Token] -> [FoundThing]
 getcons scope ftt (Token "=" _: Token name pos : xs) =
-        FoundThing ftt name pos nosig scope : getcons2 scope xs
+        FoundThing ftt name pos (conssig xs) scope
+        : getcons2 scope xs
 getcons scope ftt (_:xs) = getcons scope ftt xs
 getcons _ _ [] = []
 
 
 getcons2 :: Scope -> [Token] -> [FoundThing]
 getcons2 scope (Token name pos : Token "::" _ : xs) =
-        FoundThing FTConsAccessor name pos nosig scope : getcons2 scope xs
+        FoundThing FTConsAccessor name pos (conssig xs) scope
+        : getcons2 scope xs
 getcons2 _ (Token "=" _ : _) = []
 getcons2 scope (Token "|" _ : Token name pos : xs) =
-        FoundThing FTCons name pos nosig scope : getcons2 scope xs
+        FoundThing FTCons name pos (conssig xs) scope
+        : getcons2 scope xs
 getcons2 scope (_:xs) = getcons2 scope xs
 getcons2 _ [] = []
 
+-- | Assemes 'cleanupCons' happened on the tokens.
+conssig :: [Token] -> Signature
+conssig = decorateSignature . intercalate " " . reverse . go []
+    where
+        go acc (NewLine _ : xs) = go acc xs  -- should not happen
+        go acc (Token _ _ : Token "::" _ : _) = acc  -- GADT stop case
+        go acc (Token s _ : _) | s `elem` ["|", "deriving"] = acc
+        go acc (Token s _ : xs) = go (s:acc) xs
+        go acc [] = acc
 
 splitByNL :: Maybe Int -> [Token] -> [[Token]]
 splitByNL maybeIndent (nl@(NewLine _):ts) =
