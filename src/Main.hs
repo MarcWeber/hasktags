@@ -7,7 +7,6 @@ import System.Environment
 
 import Data.List
 
-import System.IO
 import System.Directory
 import System.Console.GetOpt
 import System.Exit

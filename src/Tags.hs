@@ -90,7 +90,16 @@ instance Show FoundThingType where
   show FTConsAccessor = "c_a"
   show FTOther = "o"
 
-data FoundThing = FoundThing FoundThingType ThingName Pos
+-- | For Tagbar plugin of vim, displayed after thing name.
+-- No signature if empty.
+type Signature = String
+
+-- | For Tagbar plugin of vim, groups thing under the thing referred in scope.
+-- Example: "data:TheTypeCtorOfThisCtor"
+-- No scope if empty.
+type Scope = String
+
+data FoundThing = FoundThing FoundThingType ThingName Pos Signature Scope
         deriving (Show,Eq,Typeable,Data)
 
 -- Data we have obtained from a file
@@ -108,13 +117,15 @@ ctagEncode a = [a]
 -- | Dump found tag in normal or extended (read : vim like) ctag
 -- line
 dumpthing :: Bool -> FoundThing -> String
-dumpthing False (FoundThing _ name (Pos filename line _ _)) =
+dumpthing False (FoundThing _ name (Pos filename line _ _) _ _) =
     name ++ "\t" ++ filename ++ "\t" ++ show (line + 1)
-dumpthing True (FoundThing kind name (Pos filename line _ lineText)) =
+dumpthing True (FoundThing kind name (Pos filename line _ lineText) sig scope) =
     name ++ "\t" ++ filename
          ++ "\t/^" ++ concatMap ctagEncode lineText
          ++ "$/;\"\t" ++ show kind
          ++ "\tline:" ++ show (line + 1)
+         ++ (if null sig then "" else "\tsignature:" ++ sig)
+         ++ (if null scope then "" else "\t" ++ scope)
 
 
 -- stuff for dealing with ctags output format
@@ -135,7 +146,8 @@ writectagsfile ctagsfile extended filedata = do
 sortThings :: [FoundThing] -> [FoundThing]
 sortThings = sortBy comp
   where
-        comp (FoundThing _ a (Pos f1 l1 _ _)) (FoundThing _ b (Pos f2 l2 _ _)) =
+        comp (FoundThing _ a (Pos f1 l1 _ _) _ _)
+             (FoundThing _ b (Pos f2 l2 _ _) _ _) =
             c (c (compare a b) (compare f1 f2)) (compare l1 l2)
         c a b = if a == EQ then b else a
 
@@ -152,7 +164,7 @@ etagsDumpFileData (FileData filename things) =
           thingslength = length thingsdump
 
 etagsDumpThing :: FoundThing -> String
-etagsDumpThing (FoundThing _ name (Pos _filename line token fullline)) =
+etagsDumpThing (FoundThing _ name (Pos _filename line token fullline) _ _) =
   let wrds = mywords True fullline
   in concat (take token wrds ++ map (take 1) (take 1 $ drop token wrds))
         ++ "\x7f"
