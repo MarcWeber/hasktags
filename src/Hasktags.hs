@@ -269,10 +269,12 @@ findThingsInBS ignoreCloseImpl filename bs = do
                                                && t2 == FTFuncImpl )
 
         let iCI = if ignoreCloseImpl
-              then nubBy (\(FoundThing _ n1 (Pos f1 l1 _ _) _ _)
-                         (FoundThing _ n2 (Pos f2 l2 _ _) _ _)
+              -- TODO it seems incidental that this keeps the defs (as desired) and not the impls.
+              then nubBy (\(FoundThing t1 n1 (Pos f1 l1 _ _) _ _)
+                         (FoundThing t2 n2 (Pos f2 l2 _ _) _ _)
                          -> f1 == f2
                            && n1 == n2
+                           && (FTFuncTypeDef ==) `any` [t1, t2]
                            && ((<= 7) $ abs $ l2 - l1))
               else id
         let things = iCI $ filterAdjacentFuncImpl $ concatMap findstuff $ map (\s -> trace_ "section in findThingsInBS" s s) sections
