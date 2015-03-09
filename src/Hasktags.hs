@@ -370,7 +370,7 @@ findstuff tokens@(Token "data" _ : Token name pos : xs)
             =
               trace_  "findstuff data b1" tokens $
               FoundThing FTDataGADT name pos nosig noscope
-              : getcons2 noscope xs ++ fromWhereOn xs -- ++ (findstuff xs)
+              : getcons2 ("GADT:" ++ name) xs ++ fromWhereOn xs -- ++ (findstuff xs)
         | otherwise
             =
               trace_  "findstuff data otherwise" tokens $
@@ -379,7 +379,7 @@ findstuff tokens@(Token "data" _ : Token name pos : xs)
 findstuff tokens@(Token "newtype" _ : ts@(Token name pos : _)) =
         trace_ "findstuff newtype" tokens $
         FoundThing FTNewtype name pos nosig noscope
-          : getcons noscope FTCons (cleanupCons ts)  -- ++ (findstuff xs)
+          : getcons ("newtype:" ++ name) FTCons (cleanupCons ts)  -- ++ (findstuff xs)
         -- FoundThing FTNewtype name pos : findstuff xs
 findstuff tokens@(Token "type" _ : Token name pos : xs) =
         trace_  "findstuff type" tokens $
@@ -482,13 +482,19 @@ getcons2 _ [] = []
 
 -- | Assemes 'cleanupCons' happened on the tokens.
 conssig :: [Token] -> Signature
-conssig = decorateSignature . intercalate " " . reverse . go []
+conssig = decorateSignature . intercalate " "
+        . dropRecordArtifacts . reverse . dropRecordArtifacts . go []
     where
         go acc (NewLine _ : xs) = go acc xs  -- should not happen
         go acc (Token _ _ : Token "::" _ : _) = acc  -- GADT stop case
         go acc (Token s _ : _) | s `elem` ["|", "deriving"] = acc
         go acc (Token s _ : xs) = go (s:acc) xs
         go acc [] = acc
+        -- | Needed since record-style datas have parts of the signature split
+        -- among the 'constructor accessors', leaving artifacts at the ctor
+        -- signature and the ends of the record fields.
+        dropRecordArtifacts (s:xs) | s `elem` ["{", "}", ","] = xs
+        dropRecordArtifacts xs = xs
 
 splitByNL :: Maybe Int -> [Token] -> [[Token]]
 splitByNL maybeIndent (nl@(NewLine _):ts) =
