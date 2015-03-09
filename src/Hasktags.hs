@@ -374,16 +374,16 @@ findstuff tokens@(Token "data" _ : Token name pos : xs)
         | otherwise
             =
               trace_  "findstuff data otherwise" tokens $
-              FoundThing FTData name pos nosig noscope
+              FoundThing FTData name pos (datasig xs) noscope
               : getcons ("data:" ++ name) FTCons (cleanupCons xs)  -- ++ (findstuff xs)
-findstuff tokens@(Token "newtype" _ : ts@(Token name pos : _)) =
+findstuff tokens@(Token "newtype" _ : ts@(Token name pos : xs)) =
         trace_ "findstuff newtype" tokens $
-        FoundThing FTNewtype name pos nosig noscope
+        FoundThing FTNewtype name pos (datasig xs) noscope
           : getcons ("newtype:" ++ name) FTCons (cleanupCons ts)  -- ++ (findstuff xs)
         -- FoundThing FTNewtype name pos : findstuff xs
 findstuff tokens@(Token "type" _ : Token name pos : xs) =
         trace_  "findstuff type" tokens $
-        FoundThing FTType name pos nosig noscope : findstuff xs
+        FoundThing FTType name pos (datasig xs) noscope : findstuff xs
 findstuff tokens@(Token "class" _ : xs) =
         trace_  "findstuff class" tokens $
         case (break ((== "where").tokenString) xs) of
@@ -495,6 +495,13 @@ conssig = decorateSignature . intercalate " "
         -- signature and the ends of the record fields.
         dropRecordArtifacts (s:xs) | s `elem` ["{", "}", ","] = xs
         dropRecordArtifacts xs = xs
+
+datasig :: [Token] -> Signature
+datasig = decorateSignature . intercalate " " . reverse . go []
+    where
+        go acc (Token "=" _ : _) = acc
+        go acc (Token s _ : xs) = go (s:acc) xs
+        go acc _ = acc
 
 splitByNL :: Maybe Int -> [Token] -> [[Token]]
 splitByNL maybeIndent (nl@(NewLine _):ts) =
