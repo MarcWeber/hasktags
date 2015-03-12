@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE RecordWildCards #-}
 -- should this be named Data.Hasktags or such?
 module Hasktags (
   FileData,
@@ -109,6 +110,7 @@ getOutFile defaultName openMode []                 = openFile
 
 data Mode = ExtendedCtag
           | IgnoreCloseImpl
+          | IgnoreCloseCons
           | ETags
           | CTags
           | BothTags
@@ -141,6 +143,12 @@ isNewLine _ _ = False
 trimNewlines :: [Token] -> [Token]
 trimNewlines = filter (not . isNewLine Nothing)
 
+data FindOptions = FindOptions
+  { doCache :: Bool
+  , ignoreCloseImpl :: Bool
+  , ignoreCloseCons :: Bool
+  } deriving (Show)
+
 generate :: [Mode] -> [FileName] -> IO ()
 generate modes filenames = do
 
@@ -148,8 +156,10 @@ generate modes filenames = do
       openFileMode = if Append `elem` modes
                      then AppendMode
                      else WriteMode
-  filedata <- mapM (findWithCache (CacheFiles `elem` modes)
-                                  (IgnoreCloseImpl `elem` modes))
+  filedata <- mapM (findWithCache $ FindOptions
+                                  (CacheFiles `elem` modes)
+                                  (IgnoreCloseImpl `elem` modes)
+                                  (IgnoreCloseCons `elem` modes))
                    filenames
 
   when (mode == CTags)
@@ -174,9 +184,9 @@ generate modes filenames = do
 
 -- Find the definitions in a file, or load from cache if the file
 -- hasn't changed since last time.
-findWithCache :: Bool -> Bool -> FileName -> IO FileData
-findWithCache cache ignoreCloseImpl filename = do
-  cacheExists <- if cache then doesFileExist cacheFilename else return False
+findWithCache :: FindOptions -> FileName -> IO FileData
+findWithCache opts filename = do
+  cacheExists <- if doCache opts then doesFileExist cacheFilename else return False
   if cacheExists
      then do fileModified <- getModificationTime filename
              cacheModified <- getModificationTime cacheFilename
@@ -189,8 +199,8 @@ findWithCache cache ignoreCloseImpl filename = do
   where cacheFilename = filenameToTagsName filename
         filenameToTagsName = (++"tags") . reverse . dropWhile (/='.') . reverse
         findAndCache = do
-          filedata <- findThings ignoreCloseImpl filename
-          when cache (writeFile cacheFilename (encodeJSON filedata))
+          filedata <- findThings opts filename
+          when (doCache opts) (writeFile cacheFilename (encodeJSON filedata))
           return filedata
 
 -- eg Data.Text says that using ByteStrings could be fastest depending on ghc
@@ -202,12 +212,12 @@ utf8_to_char8_hack :: String -> String
 utf8_to_char8_hack = BS.unpack . BS8.fromString
 
 -- Find the definitions in a file
-findThings :: Bool -> FileName -> IO FileData
-findThings ignoreCloseImpl filename =
-  fmap (findThingsInBS ignoreCloseImpl filename) $ BS.readFile filename
+findThings :: FindOptions -> FileName -> IO FileData
+findThings opts filename =
+  fmap (findThingsInBS opts filename) $ BS.readFile filename
 
-findThingsInBS :: Bool -> String -> BS.ByteString -> FileData
-findThingsInBS ignoreCloseImpl filename bs = do
+findThingsInBS :: FindOptions -> String -> BS.ByteString -> FileData
+findThingsInBS FindOptions{..} filename bs = do
         let aslines = lines $ BS.unpack bs
 
         let stripNonHaskellLines = let
@@ -268,16 +278,18 @@ findThingsInBS ignoreCloseImpl filename bs = do
                                                && t1 == FTFuncImpl
                                                && t2 == FTFuncImpl )
 
-        let iCI = if ignoreCloseImpl
-              -- TODO it seems incidental that this keeps the defs (as desired) and not the impls.
+        let dedup enabled things =
+              if enabled
               then nubBy (\(FoundThing t1 n1 (Pos f1 l1 _ _) _ _)
                          (FoundThing t2 n2 (Pos f2 l2 _ _) _ _)
                          -> f1 == f2
                            && n1 == n2
-                           && (FTFuncTypeDef ==) `any` [t1, t2]
+                           && (\t -> (t ==) `any` things) `any` [t1, t2]
                            && ((<= 7) $ abs $ l2 - l1))
               else id
-        let things = iCI $ filterAdjacentFuncImpl $ concatMap findstuff $ map (\s -> trace_ "section in findThingsInBS" s s) sections
+        let things = dedup ignoreCloseImpl [FTFuncImpl]
+                   $ dedup ignoreCloseCons [FTCons, FTConsGADT, FTConsAccessor]
+                   $ filterAdjacentFuncImpl $ concatMap findstuff $ map (\s -> trace_ "section in findThingsInBS" s s) sections
         let
           -- If there's a module with the same name of another definition, we
           -- are not interested in the module, but only in the definition.

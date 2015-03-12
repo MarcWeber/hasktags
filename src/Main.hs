@@ -26,10 +26,15 @@ options = [ Option "c" ["ctags"]
               (NoArg Append)
             $ "append to existing CTAGS and/or ETAGS file(s). Afterward this "
               ++ "file will no longer be sorted!"
-          , Option "" ["ignore-close-implementation"]
+          , Option "I" ["ignore-close-implementation"]
               (NoArg IgnoreCloseImpl)
             $ "ignores found implementation if it is closer than 7 lines - so "
-              ++ "you can jump to definition in one shot"
+              ++ "you can jump to definition in one shot."
+          , Option "C" ["ignore-close-cons"]
+              (NoArg IgnoreCloseCons)
+            $ "ignores found data constructor if it is closer than 7 lines to "
+              ++ "the data type, you can jump to type in one shot "
+              ++ "(useful in `data X = X Int`)."
           , Option "o" ["output"]
             (ReqArg OutRedir "")
             "output to given file, instead of 'tags', '-' file is stdout"
