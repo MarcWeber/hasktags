@@ -184,7 +184,7 @@ appendFileTag (FileData filename things) = FileData filename (tag:things)
 -- Find the definitions in a file, or load from cache if the file
 -- hasn't changed since last time.
 findWithCache :: Bool -> Bool -> Bool -> FileName -> IO FileData
-findWithCache cache ignoreCloseImpl appendFileTags filename = do
+findWithCache cache ignoreCloseImpl fileTags filename = do
   cacheExists <- if cache then doesFileExist cacheFilename else return False
   if cacheExists
      then do fileModified <- getModificationTime filename
@@ -199,11 +199,9 @@ findWithCache cache ignoreCloseImpl appendFileTags filename = do
         filenameToTagsName = (++"tags") . reverse . dropWhile (/='.') . reverse
         findAndCache = do
           filedata <- findThings ignoreCloseImpl filename
-          let alldata = if appendFileTags
-                          then appendFileTag filedata
-                          else filedata
+          let alldata = if fileTags then appendFileTag filedata else filedata
           when cache (writeFile cacheFilename (encodeJSON alldata))
-          return filedata
+          return alldata
 
 -- eg Data.Text says that using ByteStrings could be fastest depending on ghc
 -- platform and whatnot - so let's keep the hacky BS.readFile >>= BS.unpack
