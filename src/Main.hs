@@ -43,6 +43,7 @@ options = [ Option "c" ["ctags"]
           , Option "L" ["follow-symlinks"] (NoArg FollowDirectorySymLinks) "follow symlinks when recursing directories"
           , Option "S" ["suffixes"] (OptArg suffStr ".hs,.lhs") "list of hs suffixes including \".\""
           , Option "R" ["tags-absolute"] (NoArg AbsolutePath) "make tags paths absolute. Useful when setting tags files in other directories"
+          , Option "F" ["file-tags"] (NoArg FileTags) "add file tags"
           , Option "h" ["help"] (NoArg Help) "This help"
           ]
   where suffStr Nothing = hsSuffixesDefault
