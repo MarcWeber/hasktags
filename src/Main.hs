@@ -43,6 +43,7 @@ options = [ Option "c" ["ctags"]
           , Option "L" ["follow-symlinks"] (NoArg FollowDirectorySymLinks) "follow symlinks when recursing directories"
           , Option "S" ["suffixes"] (OptArg suffStr ".hs,.lhs") "list of hs suffixes including \".\""
           , Option "R" ["tags-absolute"] (NoArg AbsolutePath) "make tags paths absolute. Useful when setting tags files in other directories"
+          , Option "i" ["include-hidden"] (NoArg IncludeHidden) "includes hidden files and folders during search"
           , Option "h" ["help"] (NoArg Help) "This help"
           ]
   where suffStr Nothing = hsSuffixesDefault
@@ -79,9 +80,10 @@ main = do
         let hsSuffixes = head $ [ s | (HsSuffixes s) <- modes ++ [hsSuffixesDefault] ]
 
         let followSymLinks = FollowDirectorySymLinks `elem` modes
+        let includeHidden  = IncludeHidden `elem` modes
 
         filenames
-          <- liftM (nub . concat) $ mapM (dirToFiles followSymLinks hsSuffixes) files_or_dirs
+          <- liftM (nub . concat) $ mapM (dirToFiles followSymLinks includeHidden hsSuffixes) files_or_dirs
 
         when (errs /= [] || elem Help modes || files_or_dirs == [])
              (do putStr $ unlines errs
