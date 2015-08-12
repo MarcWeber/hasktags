@@ -227,6 +227,12 @@ findThingsInBS FindOptions{..} filename bs = do
                   cppLine _ = False
                 in filter (not . emptyLine) . filter (not . cppLine)
 
+        let cleanupForeignImport =
+              let clean toks = case toks of
+                    nl:(Token "foreign" _):(Token "import" _):rest -> nl:rest
+                    _ -> toks
+              in map clean
+
         let debugStep m = (\s -> trace_ (m ++ " result") s s)
 
         let (isLiterate, slines) =
@@ -243,7 +249,8 @@ findThingsInBS FindOptions{..} filename bs = do
             = unzip slines
 
         let tokenLines {- :: [[Token]] -} =
-                        debugStep "stripNonHaskellLines" $ stripNonHaskellLines
+                        debugStep "cleanupForeignImport" $ cleanupForeignImport
+                      $ debugStep "stripNonHaskellLines" $ stripNonHaskellLines
                       $ debugStep "stripslcomments" $ stripslcomments
                       $ debugStep "splitByNL" $ splitByNL Nothing
                       $ debugStep "stripblockcomments pipe" $ stripblockcomments
