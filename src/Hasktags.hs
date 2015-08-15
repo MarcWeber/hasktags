@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE RecordWildCards #-}
 -- should this be named Data.Hasktags or such?
 module Hasktags (
   FileData,
@@ -109,6 +110,7 @@ getOutFile defaultName openMode []                 = openFile
 
 data Mode = ExtendedCtag
           | IgnoreCloseImpl
+          | IgnoreCloseCons
           | ETags
           | CTags
           | BothTags
@@ -141,6 +143,12 @@ isNewLine _ _ = False
 trimNewlines :: [Token] -> [Token]
 trimNewlines = filter (not . isNewLine Nothing)
 
+data FindOptions = FindOptions
+  { doCache :: Bool
+  , ignoreCloseImpl :: Bool
+  , ignoreCloseCons :: Bool
+  } deriving (Show)
+
 generate :: [Mode] -> [FileName] -> IO ()
 generate modes filenames = do
 
@@ -148,8 +156,10 @@ generate modes filenames = do
       openFileMode = if Append `elem` modes
                      then AppendMode
                      else WriteMode
-  filedata <- mapM (findWithCache (CacheFiles `elem` modes)
-                                  (IgnoreCloseImpl `elem` modes))
+  filedata <- mapM (findWithCache $ FindOptions
+                                  (CacheFiles `elem` modes)
+                                  (IgnoreCloseImpl `elem` modes)
+                                  (IgnoreCloseCons `elem` modes))
                    filenames
 
   when (mode == CTags)
@@ -174,9 +184,9 @@ generate modes filenames = do
 
 -- Find the definitions in a file, or load from cache if the file
 -- hasn't changed since last time.
-findWithCache :: Bool -> Bool -> FileName -> IO FileData
-findWithCache cache ignoreCloseImpl filename = do
-  cacheExists <- if cache then doesFileExist cacheFilename else return False
+findWithCache :: FindOptions -> FileName -> IO FileData
+findWithCache opts filename = do
+  cacheExists <- if doCache opts then doesFileExist cacheFilename else return False
   if cacheExists
      then do fileModified <- getModificationTime filename
              cacheModified <- getModificationTime cacheFilename
@@ -189,8 +199,8 @@ findWithCache cache ignoreCloseImpl filename = do
   where cacheFilename = filenameToTagsName filename
         filenameToTagsName = (++"tags") . reverse . dropWhile (/='.') . reverse
         findAndCache = do
-          filedata <- findThings ignoreCloseImpl filename
-          when cache (writeFile cacheFilename (encodeJSON filedata))
+          filedata <- findThings opts filename
+          when (doCache opts) (writeFile cacheFilename (encodeJSON filedata))
           return filedata
 
 -- eg Data.Text says that using ByteStrings could be fastest depending on ghc
@@ -202,12 +212,12 @@ utf8_to_char8_hack :: String -> String
 utf8_to_char8_hack = BS.unpack . BS8.fromString
 
 -- Find the definitions in a file
-findThings :: Bool -> FileName -> IO FileData
-findThings ignoreCloseImpl filename =
-  fmap (findThingsInBS ignoreCloseImpl filename) $ BS.readFile filename
+findThings :: FindOptions -> FileName -> IO FileData
+findThings opts filename =
+  fmap (findThingsInBS opts filename) $ BS.readFile filename
 
-findThingsInBS :: Bool -> String -> BS.ByteString -> FileData
-findThingsInBS ignoreCloseImpl filename bs = do
+findThingsInBS :: FindOptions -> String -> BS.ByteString -> FileData
+findThingsInBS FindOptions{..} filename bs = do
         let aslines = lines $ BS.unpack bs
 
         let stripNonHaskellLines = let
@@ -216,6 +226,12 @@ findThingsInBS ignoreCloseImpl filename bs = do
                   cppLine (_nl:t:_) = ("#" `isPrefixOf`) $ tokenString t
                   cppLine _ = False
                 in filter (not . emptyLine) . filter (not . cppLine)
+
+        let cleanupForeignImport =
+              let clean toks = case toks of
+                    nl:(Token "foreign" _):(Token "import" _):rest -> nl:rest
+                    _ -> toks
+              in map clean
 
         let debugStep m = (\s -> trace_ (m ++ " result") s s)
 
@@ -233,7 +249,8 @@ findThingsInBS ignoreCloseImpl filename bs = do
             = unzip slines
 
         let tokenLines {- :: [[Token]] -} =
-                        debugStep "stripNonHaskellLines" $ stripNonHaskellLines
+                        debugStep "cleanupForeignImport" $ cleanupForeignImport
+                      $ debugStep "stripNonHaskellLines" $ stripNonHaskellLines
                       $ debugStep "stripslcomments" $ stripslcomments
                       $ debugStep "splitByNL" $ splitByNL Nothing
                       $ debugStep "stripblockcomments pipe" $ stripblockcomments
@@ -261,27 +278,31 @@ findThingsInBS ignoreCloseImpl filename bs = do
         -- only take one of
         -- a 'x' = 7
         -- a _ = 0
-        let filterAdjacentFuncImpl = nubBy (\(FoundThing t1 n1 (Pos f1 _ _ _))
-                                             (FoundThing t2 n2 (Pos f2 _ _ _))
+        let filterAdjacentFuncImpl = nubBy (\(FoundThing t1 n1 (Pos f1 _ _ _) _ _)
+                                             (FoundThing t2 n2 (Pos f2 _ _ _) _ _)
                                              -> f1 == f2
                                                && n1 == n2
                                                && t1 == FTFuncImpl
                                                && t2 == FTFuncImpl )
 
-        let iCI = if ignoreCloseImpl
-              then nubBy (\(FoundThing _ n1 (Pos f1 l1 _ _))
-                         (FoundThing _ n2 (Pos f2 l2 _ _))
+        let dedup enabled things =
+              if enabled
+              then nubBy (\(FoundThing t1 n1 (Pos f1 l1 _ _) _ _)
+                         (FoundThing t2 n2 (Pos f2 l2 _ _) _ _)
                          -> f1 == f2
                            && n1 == n2
+                           && (\t -> (t ==) `any` things) `any` [t1, t2]
                            && ((<= 7) $ abs $ l2 - l1))
               else id
-        let things = iCI $ filterAdjacentFuncImpl $ concatMap findstuff $ map (\s -> trace_ "section in findThingsInBS" s s) sections
+        let things = dedup ignoreCloseImpl [FTFuncImpl]
+                   $ dedup ignoreCloseCons [FTCons, FTConsGADT, FTConsAccessor]
+                   $ filterAdjacentFuncImpl $ concatMap findstuff $ map (\s -> trace_ "section in findThingsInBS" s s) sections
         let
           -- If there's a module with the same name of another definition, we
           -- are not interested in the module, but only in the definition.
-          uniqueModuleName (FoundThing FTModule moduleName _)
+          uniqueModuleName (FoundThing FTModule moduleName _ _ _)
             = not
-              $ any (\(FoundThing thingType thingName _)
+              $ any (\(FoundThing thingType thingName _ _ _)
                 -> thingType /= FTModule && thingName == moduleName) things
           uniqueModuleName _ = True
         FileData filename $ filter uniqueModuleName things
@@ -304,6 +325,15 @@ stripslcomments = let f (NewLine _ : Token "--" _ : _) = False
                       f _ = True
                   in filter f
 
+stripendoflinecomments :: [Token] -> [Token]
+stripendoflinecomments = go [] False
+    where
+        go acc _ (Token "--" _ : xs) = go acc True xs
+        go acc _ (nl@(NewLine _ ): xs) = go (nl:acc) False xs
+        go acc True (_:xs) = go acc True xs
+        go acc False (t:xs) = go (t:acc) False xs
+        go acc _ [] = reverse acc
+
 stripblockcomments :: [Token] -> [Token]
 stripblockcomments (Token "{-" pos : xs) =
   trace_ "{- found at " (show pos) $
@@ -320,6 +350,26 @@ afterblockcomend (t@(Token _ pos):xs)
 afterblockcomend [] = []
 afterblockcomend (_:xs) = afterblockcomend xs
 
+nosig :: Signature
+nosig = ""
+
+noscope :: Scope
+noscope = ""
+
+-- | Appending :: <sig> would be more idiomatic, but Tagbar has
+-- special highlighting for things in parens.
+-- Maybe open an issue for Tagbar to support this?
+decorateSignature :: String -> String
+decorateSignature s = if null s then s else "(" ++ s ++ ")"
+
+-- | TODO don't leave space after/before parens, etc.
+concatTokensForSig :: [Token] -> String
+concatTokensForSig = intercalate " " . map tokenString . trimNewlines
+
+-- | Strips newlines (to make ctor finding logic simpler), and
+-- removes comments (to make signature extraction simpler).
+cleanupCons :: [Token] -> [Token]
+cleanupCons = trimNewlines . stripblockcomments . stripendoflinecomments
 
 -- does one string contain another string
 
@@ -331,28 +381,28 @@ contains sub = any (isPrefixOf sub) . tails
 findstuff :: [Token] -> [FoundThing]
 findstuff (Token "module" _ : Token name pos : _) =
         trace_ "module" pos $
-        [FoundThing FTModule name pos] -- nothing will follow this section
+        [FoundThing FTModule name pos nosig noscope] -- nothing will follow this section
 findstuff tokens@(Token "data" _ : Token name pos : xs)
         | any ( (== "where"). tokenString ) xs -- GADT
             -- TODO will be found as FTCons (not FTConsGADT), the same for
             -- functions - but they are found :)
             =
               trace_  "findstuff data b1" tokens $
-              FoundThing FTDataGADT name pos
-              : getcons2 xs ++ fromWhereOn xs -- ++ (findstuff xs)
+              FoundThing FTDataGADT name pos nosig noscope
+              : getcons2 ("GADT:" ++ name) xs ++ fromWhereOn xs -- ++ (findstuff xs)
         | otherwise
             =
               trace_  "findstuff data otherwise" tokens $
-              FoundThing FTData name pos
-              : getcons FTData (trimNewlines xs)-- ++ (findstuff xs)
-findstuff tokens@(Token "newtype" _ : ts@(Token name pos : _)) =
+              FoundThing FTData name pos (datasig xs) noscope
+              : getcons ("data:" ++ name) FTCons (cleanupCons xs)  -- ++ (findstuff xs)
+findstuff tokens@(Token "newtype" _ : ts@(Token name pos : xs)) =
         trace_ "findstuff newtype" tokens $
-        FoundThing FTNewtype name pos
-          : getcons FTCons (trimNewlines ts)-- ++ (findstuff xs)
+        FoundThing FTNewtype name pos (datasig xs) noscope
+          : getcons ("newtype:" ++ name) FTCons (cleanupCons ts)  -- ++ (findstuff xs)
         -- FoundThing FTNewtype name pos : findstuff xs
 findstuff tokens@(Token "type" _ : Token name pos : xs) =
         trace_  "findstuff type" tokens $
-        FoundThing FTType name pos : findstuff xs
+        FoundThing FTType name pos (datasig xs) noscope : findstuff xs
 findstuff tokens@(Token "class" _ : xs) =
         trace_  "findstuff class" tokens $
         case (break ((== "where").tokenString) xs) of
@@ -371,7 +421,7 @@ findstuff tokens@(Token "class" _ : xs) =
                   . reverse
                   . takeWhile ((not . (`elem` ["=>", utf8_to_char8_hack "⇒"])) . tokenString)
                   . reverse) lst of
-              (Token name p) -> Just $ FoundThing FTClass name p
+              (Token name p) -> Just $ FoundThing FTClass name p nosig noscope
               _ -> Nothing
 findstuff xs =
   trace_ "findstuff rest " xs $
@@ -380,8 +430,9 @@ findstuff xs =
 findFuncTypeDefs :: [Token] -> [Token] -> [FoundThing]
 findFuncTypeDefs found (t@(Token _ _): Token "," _ :xs) =
           findFuncTypeDefs (t : found) xs
-findFuncTypeDefs found (t@(Token _ _): Token "::" _ :_) =
-          map (\(Token name p) -> FoundThing FTFuncTypeDef name p) (t:found)
+findFuncTypeDefs found (t@(Token _ _): Token "::" _ :xs) =
+          map (\(Token name p) -> FoundThing FTFuncTypeDef name p (funSig xs) noscope) (t:found)
+    where funSig = decorateSignature . concatTokensForSig
 findFuncTypeDefs found (Token "(" _ :xs) =
           case break myBreakF xs of
             (inner@(Token _ p : _), _:xs') ->
@@ -413,13 +464,14 @@ findInfix x
    = case dropWhile
        ((/= "`"). tokenString)
        (takeWhile ( (/= "=") . tokenString) x) of
-     _ : Token name p : _ -> [FoundThing FTFuncImpl name p]
+     _ : Token name p : _ -> [FoundThing FTFuncImpl name p nosig noscope]
      _ -> []
 
 
 findF :: [Token] -> [FoundThing]
 findF (Token name p : xs) =
-    [FoundThing FTFuncImpl name p | any (("=" ==) . tokenString) xs]
+    [FoundThing FTFuncImpl name p nosig noscope
+        | any (("=" ==) . tokenString) xs]
 findF _ = []
 
 tail' :: [a] -> [a]
@@ -428,22 +480,47 @@ tail' [] = []
 
 -- get the constructor definitions, knowing that a datatype has just started
 
-getcons :: FoundThingType -> [Token] -> [FoundThing]
-getcons ftt (Token "=" _: Token name pos : xs) =
-        FoundThing ftt name pos : getcons2 xs
-getcons ftt (_:xs) = getcons ftt xs
-getcons _ [] = []
+getcons :: Scope -> FoundThingType -> [Token] -> [FoundThing]
+getcons scope ftt (Token "=" _: Token name pos : xs) =
+        FoundThing ftt name pos (conssig xs) scope
+        : getcons2 scope xs
+getcons scope ftt (_:xs) = getcons scope ftt xs
+getcons _ _ [] = []
 
 
-getcons2 :: [Token] -> [FoundThing]
-getcons2 (Token name pos : Token "::" _ : xs) =
-        FoundThing FTConsAccessor name pos : getcons2 xs
-getcons2 (Token "=" _ : _) = []
-getcons2 (Token "|" _ : Token name pos : xs) =
-        FoundThing FTCons name pos : getcons2 xs
-getcons2 (_:xs) = getcons2 xs
-getcons2 [] = []
+getcons2 :: Scope -> [Token] -> [FoundThing]
+getcons2 scope (Token name pos : Token "::" _ : xs) =
+        FoundThing FTConsAccessor name pos (conssig xs) scope
+        : getcons2 scope xs
+getcons2 _ (Token "=" _ : _) = []
+getcons2 scope (Token "|" _ : Token name pos : xs) =
+        FoundThing FTCons name pos (conssig xs) scope
+        : getcons2 scope xs
+getcons2 scope (_:xs) = getcons2 scope xs
+getcons2 _ [] = []
 
+-- | Assemes 'cleanupCons' happened on the tokens.
+conssig :: [Token] -> Signature
+conssig = decorateSignature . intercalate " "
+        . dropRecordArtifacts . reverse . dropRecordArtifacts . go []
+    where
+        go acc (NewLine _ : xs) = go acc xs  -- should not happen
+        go acc (Token _ _ : Token "::" _ : _) = acc  -- GADT stop case
+        go acc (Token s _ : _) | s `elem` ["|", "deriving"] = acc
+        go acc (Token s _ : xs) = go (s:acc) xs
+        go acc [] = acc
+        -- | Needed since record-style datas have parts of the signature split
+        -- among the 'constructor accessors', leaving artifacts at the ctor
+        -- signature and the ends of the record fields.
+        dropRecordArtifacts (s:xs) | s `elem` ["{", "}", ","] = xs
+        dropRecordArtifacts xs = xs
+
+datasig :: [Token] -> Signature
+datasig = decorateSignature . intercalate " " . reverse . go []
+    where
+        go acc (Token "=" _ : _) = acc
+        go acc (Token s _ : xs) = go (s:acc) xs
+        go acc _ = acc
 
 splitByNL :: Maybe Int -> [Token] -> [[Token]]
 splitByNL maybeIndent (nl@(NewLine _):ts) =

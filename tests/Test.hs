@@ -75,7 +75,7 @@ createTestCase filename = do
   let fd = findThingsInBS True filename bs
   let FileData _ things = fd
 
-  let foundTagNames = [name | FoundThing _ name _ <- things]
+  let foundTagNames = [name | FoundThing _ name _ _ _ <- things]
   let etags = etagsDumpFileData fd
 
   let testList = TestList [
