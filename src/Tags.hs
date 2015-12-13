@@ -115,6 +115,7 @@ dumpthing True (FoundThing kind name (Pos filename line _ lineText)) =
          ++ "\t/^" ++ concatMap ctagEncode lineText
          ++ "$/;\"\t" ++ show kind
          ++ "\tline:" ++ show (line + 1)
+         ++ "\tlanguage:Haskell"
 
 
 -- stuff for dealing with ctags output format
