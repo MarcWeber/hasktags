@@ -438,7 +438,6 @@ getcons _ [] = []
 getcons2 :: [Token] -> [FoundThing]
 getcons2 (Token name pos : Token "::" _ : xs) =
         FoundThing FTConsAccessor name pos : getcons2 xs
-getcons2 (Token "=" _ : _) = []
 getcons2 (Token "|" _ : Token name pos : xs) =
         FoundThing FTCons name pos : getcons2 xs
 getcons2 (_:xs) = getcons2 xs
