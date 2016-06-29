@@ -492,7 +492,7 @@ dirToFiles followSyms suffixes p = do
   isD <- doesDirectoryExist p
   isSymLink <-
 #ifdef VERSION_unix
-    isSymbolicLink `fmap` getSymbolicLinkStatus p
+    System.Posix.Files.isSymbolicLink `fmap` getSymbolicLinkStatus p
 #else
     return False
 #endif
