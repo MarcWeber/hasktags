@@ -34,7 +34,7 @@ import Control.Monad
 
 import DebugShow
 
-#ifdef VERSION_unix
+#if !MIN_VERSION_directory(1,2,6) && defined(VERSION_unix)
 import System.Posix.Files
 #endif
 import System.FilePath ((</>))
@@ -491,7 +491,7 @@ dirToFiles _ _ "STDIN" = fmap lines $ hGetContents stdin
 dirToFiles followSyms suffixes p = do
   isD <- doesDirectoryExist p
   isSymLink <-
-#ifdef VERSION_unix
+#if !MIN_VERSION_directory(1,2,6) && defined(VERSION_unix)
     isSymbolicLink `fmap` getSymbolicLinkStatus p
 #else
     return False
