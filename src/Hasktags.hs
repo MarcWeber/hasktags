@@ -28,7 +28,7 @@ import Data.List
 import Data.Maybe
 
 import System.IO
-import System.Directory
+import System.Directory hiding (isSymbolicLink)
 import Text.JSON.Generic
 import Control.Monad
 

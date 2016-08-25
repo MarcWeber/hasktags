@@ -16,7 +16,7 @@ import Control.Monad
 mywords :: Bool -> String -> [String]
 mywords spaced s =  case rest of
                         ')':xs -> (blanks' ++ ")") : mywords spaced xs
-			"" -> []
+                        "" -> []
                         '{':'-':xs -> (blanks' ++ "{-") : mywords spaced xs
                         '-':'}':xs -> (blanks' ++ "-}") : mywords spaced xs
                         '{':xs -> (blanks' ++ "{") : mywords spaced xs
@@ -26,22 +26,22 @@ mywords spaced s =  case rest of
                         '=':xs -> (blanks' ++ "=") : mywords spaced xs
                         ',':xs -> (blanks' ++ ",") : mywords spaced xs
                         ':':':':xs -> (blanks' ++ "::") : mywords spaced xs
-			s' -> (blanks' ++ w) : mywords spaced s''
-			      where (w, s'') = myBreak s'
-				    myBreak [] = ([],[])
-				    myBreak (':':':':xs) = ([], "::"++xs)
-				    myBreak (')':xs) = ([],')':xs)
+                        s' -> (blanks' ++ w) : mywords spaced s''
+                              where (w, s'') = myBreak s'
+                                    myBreak [] = ([],[])
+                                    myBreak (':':':':xs) = ([], "::"++xs)
+                                    myBreak (')':xs) = ([],')':xs)
                                     myBreak ('(':xs) = ([],'(':xs)
-				    myBreak ('`':xs) = ([],'`':xs)
-				    myBreak ('=':xs) = ([],'=':xs)
-				    myBreak (',':xs) = ([],',':xs)
+                                    myBreak ('`':xs) = ([],'`':xs)
+                                    myBreak ('=':xs) = ([],'=':xs)
+                                    myBreak (',':xs) = ([],',':xs)
                                     myBreak xss@(x:xs)
                                       | isSpace x
                                         = if spaced
                                           then ([], xss)
                                           else ([], dropWhile isSpace xss)
                                       | otherwise = let (a,b) = myBreak xs
-						    in  (x:a,b)
+                                                    in  (x:a,b)
                     where blanks' = if spaced then blanks else ""
                           (blanks, rest) = span {-partain:Char.-}isSpace s
 
@@ -159,4 +159,3 @@ etagsDumpThing (FoundThing _ name (Pos _filename line token fullline)) =
         ++ "\x7f"
         ++ name ++ "\x01"
         ++ show line ++ "," ++ show (line + 1) ++ "\n"
-
