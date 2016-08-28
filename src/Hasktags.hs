@@ -15,29 +15,42 @@ module Hasktags (
 
   dirToFiles
 ) where
-
 import Tags
-
--- the lib
+    ( FileData(..),
+      FoundThing(..),
+      FoundThingType(FTConsAccessor, FTFuncTypeDef, FTClass, FTType,
+                     FTCons, FTNewtype, FTData, FTDataGADT, FTModule, FTFuncImpl),
+      Pos(..),
+      FileName,
+      mywords,
+      writectagsfile,
+      writeetagsfile )
 import qualified Data.ByteString.Char8 as BS
-
-import qualified Data.ByteString.UTF8 as BS8 -- see notes at utf8_to_char8_hack
-
-import Data.Char
-import Data.List
-import Data.Maybe
-
+    ( ByteString, unpack, readFile )
+import qualified Data.ByteString.UTF8 as BS8 ( fromString )
+import Data.Char ( isSpace )
+import Data.List ( tails, nubBy, isSuffixOf, isPrefixOf )
+import Data.Maybe ( maybeToList )
 import System.IO
-import System.Directory hiding (isSymbolicLink)
-import Text.JSON.Generic
-import Control.Monad
-
-import DebugShow
-
+    ( IOMode(WriteMode, AppendMode),
+      Handle,
+      hGetContents,
+      stdout,
+      stdin,
+      openFile,
+      hClose )
+import System.Directory
+    ( getModificationTime,
+      getDirectoryContents,
+      doesFileExist,
+      doesDirectoryExist )
+import Text.JSON.Generic ( encodeJSON, decodeJSON )
+import Control.Monad ( when )
+import DebugShow ( trace_ )
 #ifdef VERSION_unix
-import System.Posix.Files
+import System.Posix.Files ( isSymbolicLink, getSymbolicLinkStatus )
 #endif
-import System.FilePath ((</>))
+import System.FilePath ( (</>) )
 
 -- search for definitions of things
 -- we do this by looking for the following patterns:
