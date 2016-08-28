@@ -84,9 +84,6 @@ Executable hasktags
   if flag(debug)
     cpp-options: -Ddebug
 
--- Either ./Setup sdist complains about missing executable for test case or
--- ./Setup configure (having same executable twice, "consider this a bug")
-
 Executable test
     Main-Is: Test.hs
     Build-Depends:
