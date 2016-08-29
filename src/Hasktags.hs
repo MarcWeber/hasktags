@@ -35,7 +35,7 @@ import Control.Monad
 import DebugShow
 
 #ifdef VERSION_unix
-import System.Posix.Files
+import System.Posix.Files as SPF
 #endif
 import System.FilePath ((</>))
 
@@ -492,7 +492,7 @@ dirToFiles followSyms suffixes p = do
   isD <- doesDirectoryExist p
   isSymLink <-
 #ifdef VERSION_unix
-    isSymbolicLink `fmap` getSymbolicLinkStatus p
+    SPF.isSymbolicLink `fmap` getSymbolicLinkStatus p
 #else
     return False
 #endif
