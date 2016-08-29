@@ -11,7 +11,7 @@ homepage: http://github.com/MarcWeber/hasktags
 bug-reports: http://github.com/MarcWeber/hasktags/issues
 Synopsis: Produces ctags "tags" and etags "TAGS" files for Haskell programs
 Description:
-	Produces ctags "tags" and etags "TAGS" files for Haskell programs.
+  Produces ctags "tags" and etags "TAGS" files for Haskell programs.
 Category: Development
 build-type: Simple
 cabal-version: >=1.10
@@ -56,8 +56,8 @@ library
   hs-source-dirs:    src
   ghc-options:       -Wall
   exposed-modules:   Hasktags
-  other-modules:     Tags, DebugShow 
-  build-depends:       
+  other-modules:     Tags, DebugShow
+  build-depends:
     utf8-string,
     base >= 4 && < 5,
     bytestring >= 0.9 && < 0.11,
@@ -84,38 +84,43 @@ Executable hasktags
   if flag(debug)
     cpp-options: -Ddebug
 
--- Either ./Setup sdist complains about missing executable for test case or
--- ./Setup configure (having same executable twice, "consider this a bug")
+Executable test
+    Main-Is: Test.hs
+    Build-Depends:
+      utf8-string,
+      base,
+      bytestring,
+      directory,
+      filepath,
+      json,
+      HUnit
+    other-modules: Tags, Hasktags, DebugShow
+    hs-source-dirs: src, tests
+    ghc-options: -Wall
+    default-language: Haskell2010
 
--- Executable test
---     Main-Is: Test.hs
---     Build-Depends:
---       utf8-string,
---       base >= 4 && < 5,
---       bytestring >= 0.9 && < 0.11,
---       directory >= 1.1 && < 1.3,
---       filepath,
---       json >= 0.5 && < 0.8,
---       HUnit >= 1.2 && < 1.3
---     other-modules: Tags, Hasktags, DebugShow
---     hs-source-dirs: src, tests
---     ghc-options: -Wall
---     default-language: Haskell2010
--- 
---   if !os(windows)
---     build-depends: unix
--- 
---   if flag(debug)
---     cpp-options: -Ddebug
--- 
--- Test-Suite test
---   Type: exitcode-stdio-1.0
---   Main-Is: Test.hs
---   hs-source-dirs: src, tests
---   Build-Depends: base, bytestring, directory, filepath, json,
---     HUnit >= 1.2 && < 1.3
---   ghc-options: -Wall
---   default-language: Haskell2010
--- 
---   if flag(debug)
---     cpp-options: -Ddebug
+  if !os(windows)
+    build-depends: unix
+
+  if flag(debug)
+    cpp-options: -Ddebug
+
+Test-Suite testsuite
+  Type: exitcode-stdio-1.0
+  Main-Is: Test.hs
+  hs-source-dirs: src, tests
+  Build-Depends:
+                utf8-string,
+                base,
+                bytestring,
+                directory,
+                filepath,
+                json,
+                HUnit,
+                unix
+  other-modules: Tags, Hasktags, DebugShow
+  ghc-options: -Wall
+  default-language: Haskell2010
+
+  if flag(debug)
+    cpp-options: -Ddebug

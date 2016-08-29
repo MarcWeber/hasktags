@@ -3,12 +3,11 @@
 -- this should be moved into its own library (after cleaning up most of it ..)
 -- yes, this is still specific to hasktags :(
 module Tags where
-import Data.Char
-import Data.List
-import Data.Data
-
-import System.IO
-import Control.Monad
+import Data.Char ( isSpace )
+import Data.List ( sortBy )
+import Data.Data ( Data, Typeable )
+import System.IO ( Handle, hPutStrLn, hPutStr )
+import Control.Monad ( when )
 
 -- my words is mainly copied from Data.List.
 -- difference abc::def is recognized as three words
