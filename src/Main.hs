@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE CPP #-}
+
 module Main (main) where
 import Hasktags
 

@@ -14,7 +14,7 @@ trace_ msg thing ret = trace ("\nmsg: " ++ msg ++ " " ++ (show thing) ++ "\n") r
 #else
 
 -- id function - should have no effect
-trace_ :: (Show a) => String -> a -> b -> b
+trace_ :: String -> a -> b -> b
 trace_ _ _ ret = ret
 {-# INLINE trace_ #-}
 

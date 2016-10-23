@@ -3,12 +3,11 @@
 -- this should be moved into its own library (after cleaning up most of it ..)
 -- yes, this is still specific to hasktags :(
 module Tags where
-import Data.Char
-import Data.List
-import Data.Data
-
-import System.IO
-import Control.Monad
+import Data.Char ( isSpace )
+import Data.List ( sortBy )
+import Data.Data ( Data, Typeable )
+import System.IO ( Handle, hPutStrLn, hPutStr )
+import Control.Monad ( when )
 
 -- my words is mainly copied from Data.List.
 -- difference abc::def is recognized as three words
@@ -16,7 +15,7 @@ import Control.Monad
 mywords :: Bool -> String -> [String]
 mywords spaced s =  case rest of
                         ')':xs -> (blanks' ++ ")") : mywords spaced xs
-			"" -> []
+                        "" -> []
                         '{':'-':xs -> (blanks' ++ "{-") : mywords spaced xs
                         '-':'}':xs -> (blanks' ++ "-}") : mywords spaced xs
                         '{':xs -> (blanks' ++ "{") : mywords spaced xs
@@ -26,22 +25,22 @@ mywords spaced s =  case rest of
                         '=':xs -> (blanks' ++ "=") : mywords spaced xs
                         ',':xs -> (blanks' ++ ",") : mywords spaced xs
                         ':':':':xs -> (blanks' ++ "::") : mywords spaced xs
-			s' -> (blanks' ++ w) : mywords spaced s''
-			      where (w, s'') = myBreak s'
-				    myBreak [] = ([],[])
-				    myBreak (':':':':xs) = ([], "::"++xs)
-				    myBreak (')':xs) = ([],')':xs)
+                        s' -> (blanks' ++ w) : mywords spaced s''
+                              where (w, s'') = myBreak s'
+                                    myBreak [] = ([],[])
+                                    myBreak (':':':':xs) = ([], "::"++xs)
+                                    myBreak (')':xs) = ([],')':xs)
                                     myBreak ('(':xs) = ([],'(':xs)
-				    myBreak ('`':xs) = ([],'`':xs)
-				    myBreak ('=':xs) = ([],'=':xs)
-				    myBreak (',':xs) = ([],',':xs)
+                                    myBreak ('`':xs) = ([],'`':xs)
+                                    myBreak ('=':xs) = ([],'=':xs)
+                                    myBreak (',':xs) = ([],',':xs)
                                     myBreak xss@(x:xs)
                                       | isSpace x
                                         = if spaced
                                           then ([], xss)
                                           else ([], dropWhile isSpace xss)
                                       | otherwise = let (a,b) = myBreak xs
-						    in  (x:a,b)
+                                                    in  (x:a,b)
                     where blanks' = if spaced then blanks else ""
                           (blanks, rest) = span {-partain:Char.-}isSpace s
 
@@ -117,6 +116,7 @@ dumpthing True (FoundThing kind name (Pos filename line _ lineText)) =
          ++ "\t/^" ++ concatMap ctagEncode lineText
          ++ "$/;\"\t" ++ show kind
          ++ "\tline:" ++ show (line + 1)
+         ++ "\tlanguage:Haskell"
 
 
 -- stuff for dealing with ctags output format
@@ -160,4 +160,3 @@ etagsDumpThing (FoundThing _ name (Pos _filename line token fullline)) =
         ++ "\x7f"
         ++ name ++ "\x01"
         ++ show line ++ "," ++ show (line + 1) ++ "\n"
-
