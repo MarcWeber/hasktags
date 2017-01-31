@@ -12,14 +12,14 @@ So that you can find / jump to them fast.
 ## HOWTO (GENERATING TAG FILES):
 Build hasktags (standard cabal build)
 
-I've been using this bash function or something similar for a long time.
-It may be cumbersome but works:
-
+Ctag format:
 ```bash
-runHaskTagsVim() {
-  # use --etags instead of --ctags for emacs
-  hasktags --ignore-close-implementation --ctags .; sort tags
-}
+hasktags --ignore-close-implementation --ctags .
+```
+
+Etag format (used by emacs):
+```bash
+hasktags --ignore-close-implementation --etags .
 ```
 
 ## HOWTO (USING TAG FILES):
