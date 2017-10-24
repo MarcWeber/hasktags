@@ -180,7 +180,7 @@ generate modes filenames = do
   when (mode == BothTags)
        (do etagsfile <- getOutFile "TAGS" openFileMode modes
            writeetagsfile etagsfile filedata
-           ctagsfile <- getOutFile "tags" openFileMode modes
+           ctagsfile <- getOutFile "ctags" openFileMode modes
            writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
            hClose etagsfile
            hClose ctagsfile)
