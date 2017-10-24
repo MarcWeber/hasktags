@@ -9,3 +9,4 @@ cabal-dev
 Setup
 TAGS
 tags
+ctags
