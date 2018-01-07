@@ -17,7 +17,7 @@ Category: Development
 build-type: Simple
 cabal-version: >=1.10
 extra-source-files:
-  README,
+  README.md,
   TODO,
   testcases/HUnitBase.lhs
   testcases/Repair.lhs
