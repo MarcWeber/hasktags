@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 -- should this be named Data.Hasktags or such?
 module Hasktags (
   FileData,
