@@ -66,9 +66,6 @@ library
     filepath,
     json >= 0.5 && < 0.10
 
-  if !os(windows)
-    build-depends: unix
-
 Executable hasktags
     Main-Is: src/Main.hs
     Build-Depends:
@@ -78,9 +75,6 @@ Executable hasktags
       hasktags
     ghc-options: -Wall
     default-language: Haskell2010
-
-  if !os(windows)
-    build-depends: unix
 
   if flag(debug)
     cpp-options: -Ddebug
@@ -96,14 +90,10 @@ Test-Suite testsuite
                 directory,
                 filepath,
                 json,
-                HUnit,
-                unix
+                HUnit
   other-modules: Tags, Hasktags, DebugShow
   ghc-options: -Wall
   default-language: Haskell2010
-
-  if !os(windows)
-    build-depends: unix
 
   if flag(debug)
     cpp-options: -Ddebug
