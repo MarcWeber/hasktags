@@ -17,7 +17,7 @@ Category: Development
 build-type: Simple
 cabal-version: >=1.10
 extra-source-files:
-  README,
+  README.md,
   TODO,
   testcases/HUnitBase.lhs
   testcases/Repair.lhs
@@ -62,12 +62,9 @@ library
     utf8-string,
     base >= 4 && < 5,
     bytestring >= 0.9 && < 0.11,
-    directory >= 1.1 && < 1.4,
+    directory >= 1.2.6 && < 1.4,
     filepath,
     json >= 0.5 && < 0.10
-
-  if !os(windows)
-    build-depends: unix
 
 Executable hasktags
     Main-Is: src/Main.hs
@@ -78,9 +75,6 @@ Executable hasktags
       hasktags
     ghc-options: -Wall
     default-language: Haskell2010
-
-  if !os(windows)
-    build-depends: unix
 
   if flag(debug)
     cpp-options: -Ddebug
@@ -96,14 +90,10 @@ Test-Suite testsuite
                 directory,
                 filepath,
                 json,
-                HUnit,
-                unix
+                HUnit
   other-modules: Tags, Hasktags, DebugShow
   ghc-options: -Wall
   default-language: Haskell2010
-
-  if !os(windows)
-    build-depends: unix
 
   if flag(debug)
     cpp-options: -Ddebug
