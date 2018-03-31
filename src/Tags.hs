@@ -73,6 +73,7 @@ data FoundThingType
     | FTOther
     | FTConsAccessor
     | FTConsGADT
+    | FTPattern
   deriving (Eq,Typeable,Data)
 
 instance Show FoundThingType where
@@ -88,6 +89,7 @@ instance Show FoundThingType where
   show FTConsGADT = "c_gadt"
   show FTConsAccessor = "c_a"
   show FTOther = "o"
+  show FTPattern = "p"
 
 data FoundThing = FoundThing FoundThingType ThingName Pos
         deriving (Show,Eq,Typeable,Data)

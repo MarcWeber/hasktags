@@ -16,7 +16,7 @@ module Hasktags (
 import Tags
     ( FileData(..),
       FoundThing(..),
-      FoundThingType(FTConsAccessor, FTFuncTypeDef, FTClass, FTType,
+      FoundThingType(FTConsAccessor, FTFuncTypeDef, FTClass, FTType, FTPattern,
                      FTCons, FTNewtype, FTData, FTDataGADT, FTModule, FTFuncImpl),
       Pos(..),
       FileName,
@@ -382,6 +382,9 @@ findstuff tokens@(Token "class" _ : xs) =
                   . reverse) lst of
               (Token name p) -> Just $ FoundThing FTClass name p
               _ -> Nothing
+findstuff tokens@(Token "pattern" _ : Token name pos : xs) =
+        trace_ "findstuff pattern" tokens $
+        FoundThing FTPattern name pos : findstuff xs
 findstuff xs =
   trace_ "findstuff rest " xs $
   findFunc xs ++ findFuncTypeDefs [] xs
