@@ -49,6 +49,8 @@ type FileName = String
 
 type ThingName = String
 
+type Scope = Maybe (FoundThingType, String)
+
 -- The position of a token or definition
 data Pos = Pos
                 FileName -- file name
@@ -61,32 +63,48 @@ data Pos = Pos
 -- I'm not sure wether I've used the right names.. but I hope you fix it / get
 -- what I mean
 data FoundThingType
-  = FTFuncTypeDef
-    | FTFuncImpl
+  = FTFuncTypeDef String Scope
+    | FTFuncImpl Scope
     | FTType
     | FTData
     | FTDataGADT
     | FTNewtype
     | FTClass
+    | FTInstance
     | FTModule
-    | FTCons
+    | FTCons FoundThingType String
     | FTOther
-    | FTConsAccessor
-    | FTConsGADT
+    | FTConsAccessor FoundThingType String String
+    | FTConsGADT String
+    | FTPatternTypeDef String
+    | FTPattern
   deriving (Eq,Typeable,Data)
 
 instance Show FoundThingType where
-  show FTFuncTypeDef = "ft"
-  show FTFuncImpl = "fi"
+  show (FTFuncTypeDef s (Just (FTClass, p))) =
+      "ft\t" ++ "signature:(" ++ s ++ ")\t" ++ "class:" ++ p 
+  show (FTFuncTypeDef s (Just (FTInstance, p))) =
+      "ft\t" ++ "signature:(" ++ s ++ ")\t" ++ "instance:" ++ p 
+  show (FTFuncTypeDef s _) = "ft\t" ++ "signature:(" ++ s ++ ")"
+  show (FTFuncImpl (Just (FTClass, p)))= "fi\t" ++ "class:" ++ p
+  show (FTFuncImpl (Just (FTInstance, p)))= "fi\t" ++ "instance:" ++ p
+  show (FTFuncImpl _)= "fi"
   show FTType = "t"
   show FTData = "d"
   show FTDataGADT = "d_gadt"
   show FTNewtype = "nt"
   show FTClass = "c"
+  show FTInstance = "i"
   show FTModule = "m"
-  show FTCons = "cons"
-  show FTConsGADT = "c_gadt"
-  show FTConsAccessor = "c_a"
+  show (FTCons FTData p) = "cons\t" ++ "data:" ++ p
+  show (FTCons FTNewtype p) = "cons\t" ++ "newtype:" ++ p
+  show FTCons {} = "cons"
+  show (FTConsGADT p) = "c_gadt\t" ++ "d_gadt:" ++ p
+  show (FTConsAccessor FTData p c) = "c_a\t" ++ "cons:" ++ p ++ "." ++ c
+  show (FTConsAccessor FTNewtype p c) = "c_a\t" ++ "cons:" ++ p ++ "." ++ c
+  show FTConsAccessor {} = "c_a"
+  show (FTPatternTypeDef s) = "pt\t" ++ "signature:(" ++ s ++ ")"
+  show FTPattern = "pi"
   show FTOther = "o"
 
 data FoundThing = FoundThing FoundThingType ThingName Pos
