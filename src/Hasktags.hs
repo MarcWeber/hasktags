@@ -16,8 +16,10 @@ module Hasktags (
 import Tags
     ( FileData(..),
       FoundThing(..),
-      FoundThingType(FTConsAccessor, FTFuncTypeDef, FTClass, FTType,
-                     FTCons, FTNewtype, FTData, FTDataGADT, FTModule, FTFuncImpl),
+      FoundThingType(FTConsAccessor, FTFuncTypeDef, FTClass, FTInstance, FTType,
+                     FTCons, FTConsGADT, FTNewtype, FTData, FTDataGADT, FTModule, FTFuncImpl,
+                     FTPatternTypeDef, FTPattern),
+      Scope,
       Pos(..),
       FileName,
       mywords,
@@ -274,8 +276,9 @@ findThingsInBS ignoreCloseImpl filename bs = do
                                              (FoundThing t2 n2 (Pos f2 _ _ _))
                                              -> f1 == f2
                                                && n1 == n2
-                                               && t1 == FTFuncImpl
-                                               && t2 == FTFuncImpl )
+                                               && areFuncImplsOfSameScope t1 t2)
+            areFuncImplsOfSameScope (FTFuncImpl a) (FTFuncImpl b) = a == b
+            areFuncImplsOfSameScope _ _ = False
 
         let iCI = if ignoreCloseImpl
               then nubBy (\(FoundThing _ n1 (Pos f1 l1 _ _))
@@ -284,7 +287,8 @@ findThingsInBS ignoreCloseImpl filename bs = do
                            && n1 == n2
                            && ((<= 7) $ abs $ l2 - l1))
               else id
-        let things = iCI $ filterAdjacentFuncImpl $ concatMap findstuff $ map (\s -> trace_ "section in findThingsInBS" s s) sections
+        let things = iCI $ filterAdjacentFuncImpl $ concatMap (flip findstuff Nothing) $
+                map (\s -> trace_ "section in findThingsInBS" s s) sections
         let
           -- If there's a module with the same name of another definition, we
           -- are not interested in the module, but only in the definition.
@@ -309,7 +313,7 @@ withline filename sourceWords fullline i =
 -- comments stripping
 
 stripslcomments :: [[Token]] -> [[Token]]
-stripslcomments = let f (NewLine _ : Token "--" _ : _) = False
+stripslcomments = let f (NewLine _ : Token ('-':'-':_) _ : _) = False
                       f _ = True
                   in filter f
 
@@ -337,32 +341,37 @@ contains sub = any (isPrefixOf sub) . tails
 
 -- actually pick up definitions
 
-findstuff :: [Token] -> [FoundThing]
-findstuff (Token "module" _ : Token name pos : _) =
+findstuff :: [Token] -> Scope -> [FoundThing]
+findstuff (Token "module" _ : Token name pos : _) _ =
         trace_ "module" pos $
         [FoundThing FTModule name pos] -- nothing will follow this section
-findstuff tokens@(Token "data" _ : Token name pos : xs)
+findstuff tokens@(Token "data" _ : Token name pos : xs) _
         | any ( (== "where"). tokenString ) xs -- GADT
             -- TODO will be found as FTCons (not FTConsGADT), the same for
             -- functions - but they are found :)
             =
               trace_  "findstuff data b1" tokens $
               FoundThing FTDataGADT name pos
-              : getcons2 xs ++ fromWhereOn xs -- ++ (findstuff xs)
+              : getcons2 (FTConsGADT name) "" xs ++ fromWhereOn xs Nothing -- ++ (findstuff xs)
         | otherwise
             =
               trace_  "findstuff data otherwise" tokens $
               FoundThing FTData name pos
-              : getcons FTData (trimNewlines xs)-- ++ (findstuff xs)
-findstuff tokens@(Token "newtype" _ : ts@(Token name pos : _)) =
+              : getcons (FTCons FTData name) (trimNewlines xs)-- ++ (findstuff xs)
+findstuff tokens@(Token "newtype" _ : ts@(Token name pos : _))_  =
         trace_ "findstuff newtype" tokens $
         FoundThing FTNewtype name pos
-          : getcons FTCons (trimNewlines ts)-- ++ (findstuff xs)
+          : getcons (FTCons FTNewtype name) (trimNewlines ts)-- ++ (findstuff xs)
         -- FoundThing FTNewtype name pos : findstuff xs
-findstuff tokens@(Token "type" _ : Token name pos : xs) =
+findstuff tokens@(Token "type" _ : Token name pos : xs) scope =
         trace_  "findstuff type" tokens $
-        FoundThing FTType name pos : findstuff xs
-findstuff tokens@(Token "class" _ : xs) =
+        case (break ((== "where").tokenString) xs) of
+        (ys, []) ->
+          trace_ "findstuff type b1 " ys $ [FoundThing FTType name pos]
+        (ys, r) ->
+          trace_ "findstuff type b2 " (ys, r) $
+          FoundThing FTType name pos : fromWhereOn r Nothing
+findstuff tokens@(Token "class" _ : xs) _ =
         trace_  "findstuff class" tokens $
         case (break ((== "where").tokenString) xs) of
         (ys, []) ->
@@ -370,66 +379,92 @@ findstuff tokens@(Token "class" _ : xs) =
           maybeToList $ className ys
         (ys, r) ->
           trace_ "findstuff class b2 " (ys, r) $
-             (maybeToList $ className ys)
-          ++ (maybe [] (:fromWhereOn r) $ className xs)
+          maybe [] (\n@(FoundThing _ name _) -> n : fromWhereOn r (Just (FTClass, name))) $
+              className ys
     where isParenOpen (Token "(" _) = True
           isParenOpen _ = False
           className lst
-            = case (head
+            = case (head'
                   . dropWhile isParenOpen
                   . reverse
                   . takeWhile ((not . (`elem` ["=>", utf8_to_char8_hack "⇒"])) . tokenString)
                   . reverse) lst of
-              (Token name p) -> Just $ FoundThing FTClass name p
+              (Just (Token name p)) -> Just $ FoundThing FTClass name p
               _ -> Nothing
-findstuff xs =
+findstuff tokens@(Token "instance" _ : xs) _ =
+        trace_  "findstuff instance" tokens $
+        case (break ((== "where").tokenString) xs) of
+        (ys, []) ->
+          trace_ "findstuff instance b1 " ys $
+          maybeToList $ instanceName ys
+        (ys, r) ->
+          trace_ "findstuff instance b2 " (ys, r) $
+          maybe [] (\n@(FoundThing _ name _) -> n : fromWhereOn r (Just (FTInstance, name))) $
+              instanceName ys
+    where instanceName [] = Nothing
+          instanceName lst@(Token _ p :_) = Just $ FoundThing FTInstance
+            (map (\a -> if a == '.' then '-' else a) $ concatTokens lst) p
+findstuff tokens@(Token "pattern" _ : Token name pos : Token "::" _ : sig) scope =
+        trace_ "findstuff pattern type annotation" tokens $
+        [FoundThing (FTPatternTypeDef (concatTokens sig)) name pos]
+findstuff tokens@(Token "pattern" _ : Token name pos : xs) scope =
+        trace_ "findstuff pattern" tokens $
+        FoundThing FTPattern name pos : findstuff xs scope
+findstuff xs scope =
   trace_ "findstuff rest " xs $
-  findFunc xs ++ findFuncTypeDefs [] xs
+  findFunc xs scope ++ findFuncTypeDefs [] xs scope
 
-findFuncTypeDefs :: [Token] -> [Token] -> [FoundThing]
-findFuncTypeDefs found (t@(Token _ _): Token "," _ :xs) =
-          findFuncTypeDefs (t : found) xs
-findFuncTypeDefs found (t@(Token _ _): Token "::" _ :_) =
-          map (\(Token name p) -> FoundThing FTFuncTypeDef name p) (t:found)
-findFuncTypeDefs found (Token "(" _ :xs) =
+findFuncTypeDefs :: [Token] -> [Token] -> Scope -> [FoundThing]
+findFuncTypeDefs found (t@(Token _ _): Token "," _ :xs) scope =
+          findFuncTypeDefs (t : found) xs scope
+findFuncTypeDefs found (t@(Token _ _): Token "::" _ : sig) scope =
+          map (\(Token name p) -> FoundThing (FTFuncTypeDef (concatTokens sig) scope) name p) (t:found)
+findFuncTypeDefs found xs@(Token "(" _ :_) scope =
           case break myBreakF xs of
-            (inner@(Token _ p : _), _:xs') ->
-              let merged = Token ( concatMap (\(Token x _) -> x) inner ) p
-              in findFuncTypeDefs found $ merged : xs'
+            (inner@(Token _ p : _), rp : xs') ->
+              let merged = Token ( concatMap (\(Token x _) -> x) $ inner ++ [rp] ) p
+              in findFuncTypeDefs found (merged : xs') scope
             _ -> []
     where myBreakF (Token ")" _) = True
           myBreakF _ = False
-findFuncTypeDefs _ _ = []
+findFuncTypeDefs _ _ _ = []
 
-fromWhereOn :: [Token] -> [FoundThing]
-fromWhereOn [] = []
-fromWhereOn [_] = []
-fromWhereOn (_: xs@(NewLine _ : _)) =
-             concatMap (findstuff . tail')
+fromWhereOn :: [Token] -> Scope -> [FoundThing]
+fromWhereOn [] _ = []
+fromWhereOn [_] _ = []
+fromWhereOn (_: xs@(NewLine _ : _)) scope =
+             concatMap (flip findstuff scope . tail')
              $ splitByNL (Just ( minimum
                                 . (10000:)
                                 . map (\(NewLine i) -> i)
                                 . filter (isNewLine Nothing) $ xs)) xs
-fromWhereOn (_:xw) = findstuff xw
+fromWhereOn (_:xw) scope = findstuff xw scope
 
-findFunc :: [Token] -> [FoundThing]
-findFunc x = case findInfix x of
+findFunc :: [Token] -> Scope -> [FoundThing]
+findFunc x scope = case findInfix x scope of
     a@(_:_) -> a
-    _ -> findF x
+    _ -> findF x scope
 
-findInfix :: [Token] -> [FoundThing]
-findInfix x
+findInfix :: [Token] -> Scope -> [FoundThing]
+findInfix x scope
    = case dropWhile
        ((/= "`"). tokenString)
        (takeWhile ( (/= "=") . tokenString) x) of
-     _ : Token name p : _ -> [FoundThing FTFuncImpl name p]
+     _ : Token name p : _ -> [FoundThing (FTFuncImpl scope) name p]
      _ -> []
 
 
-findF :: [Token] -> [FoundThing]
-findF (Token name p : xs) =
-    [FoundThing FTFuncImpl name p | any (("=" ==) . tokenString) xs]
-findF _ = []
+findF :: [Token] -> Scope -> [FoundThing]
+findF ts@(Token "(" p : _) scope =
+    let (name, xs) = extractOperator ts in
+    [FoundThing (FTFuncImpl scope) name p | any (("=" ==) . tokenString) xs]
+findF (Token name p : xs) scope =
+    [FoundThing (FTFuncImpl scope) name p | any (("=" ==) . tokenString) xs]
+findF _ _ = []
+
+head' :: [a] -> Maybe a
+head' (x:_) = Just x
+head' [] = Nothing
 
 tail' :: [a] -> [a]
 tail' (_:xs) = xs
@@ -439,18 +474,20 @@ tail' [] = []
 
 getcons :: FoundThingType -> [Token] -> [FoundThing]
 getcons ftt (Token "=" _: Token name pos : xs) =
-        FoundThing ftt name pos : getcons2 xs
+        FoundThing ftt name pos : getcons2 ftt name xs
 getcons ftt (_:xs) = getcons ftt xs
 getcons _ [] = []
 
 
-getcons2 :: [Token] -> [FoundThing]
-getcons2 (Token name pos : Token "::" _ : xs) =
-        FoundThing FTConsAccessor name pos : getcons2 xs
-getcons2 (Token "|" _ : Token name pos : xs) =
-        FoundThing FTCons name pos : getcons2 xs
-getcons2 (_:xs) = getcons2 xs
-getcons2 [] = []
+getcons2 :: FoundThingType -> String -> [Token] -> [FoundThing]
+getcons2 ftt@(FTCons pt p) c (Token name pos : Token "::" _ : xs) =
+        FoundThing (FTConsAccessor pt p c) name pos : getcons2 ftt c xs
+getcons2 ftt@(FTConsGADT p) _ (Token name pos : Token "::" _ : xs) =
+        FoundThing ftt name pos : getcons2 ftt p xs
+getcons2 ftt _ (Token "|" _ : Token name pos : xs) =
+        FoundThing ftt name pos : getcons2 ftt name xs
+getcons2 ftt c (_:xs) = getcons2 ftt c xs
+getcons2 _ _ [] = []
 
 
 splitByNL :: Maybe Int -> [Token] -> [[Token]]
@@ -509,3 +546,28 @@ dirToFiles followSyms suffixes p = do
           contents <- filter ((/=) '.' . head) `fmap` getDirectoryContents p
           concat `fmap` (mapM (dirToFiles followSyms suffixes . (</>) p) contents)
   where matchingSuffix = any (`isSuffixOf` p) suffixes
+
+concatTokens :: [Token] -> String
+concatTokens = smartUnwords . map (\(Token name _) -> name) .
+  filter (not . isNewLine Nothing) . stripilcomments
+  where smartUnwords [] = []
+        smartUnwords a = foldr (\v -> (glueNext v ++)) "" $ a `zip` tail (a ++ [""])
+        glueNext (a@("("), _) = a
+        glueNext (a, ")") = a
+        glueNext (a@("["), _) = a
+        glueNext (a, "]") = a
+        glueNext (a, ",") = a
+        glueNext (a, "") = a
+        glueNext (a, _) = a ++ " "
+        stripilcomments = fst .
+          foldl (\(a, c) v -> case v of
+                                Token ('-':'-':_) _ -> (a, True)
+                                NewLine _ -> (a ++ [v], False)
+                                _ -> if c then (a, c) else (a ++ [v], c)
+                ) ([], False)
+
+extractOperator :: [Token] -> (String, [Token])
+extractOperator ts@(Token "(" _ : _) =
+    (\(a, b) -> (foldr ((++) . tokenString) ")" a, tail' b)) $
+        break ((== ")") . tokenString) ts
+extractOperator _ = ("", [])
