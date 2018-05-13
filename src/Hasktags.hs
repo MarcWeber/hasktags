@@ -13,42 +13,29 @@ module Hasktags (
 
   dirToFiles
 ) where
-import Tags
-    ( FileData(..),
-      FoundThing(..),
-      FoundThingType(FTConsAccessor, FTFuncTypeDef, FTClass, FTInstance, FTType,
-                     FTCons, FTConsGADT, FTNewtype, FTData, FTDataGADT, FTModule, FTFuncImpl,
-                     FTPatternTypeDef, FTPattern),
-      Scope,
-      Pos(..),
-      FileName,
-      mywords,
-      writectagsfile,
-      writeetagsfile )
-import qualified Data.ByteString.Lazy.Char8 as BS
-    ( ByteString, unpack, readFile )
-import qualified Data.ByteString.Lazy.UTF8 as BS8 ( fromString )
-import Data.Char ( isSpace )
-import Data.List ( tails, nubBy, isSuffixOf, isPrefixOf )
-import Data.Maybe ( maybeToList )
-import System.IO
-    ( IOMode(WriteMode, AppendMode),
-      Handle,
-      hGetContents,
-      stdout,
-      stdin,
-      openFile,
-      hClose )
-import System.Directory
-    ( getModificationTime,
-      getDirectoryContents,
-      doesFileExist,
-      doesDirectoryExist,
-      isSymbolicLink )
-import Text.JSON.Generic ( encodeJSON, decodeJSON )
-import Control.Monad ( when )
-import DebugShow ( trace_ )
-import System.FilePath ( (</>) )
+import           Control.Monad              (when)
+import qualified Data.ByteString.Lazy.Char8 as BS (ByteString, readFile, unpack)
+import qualified Data.ByteString.Lazy.UTF8  as BS8 (fromString)
+import           Data.Char                  (isSpace)
+import           Data.List                  (isPrefixOf, isSuffixOf, nubBy,
+                                             tails)
+import           Data.Maybe                 (maybeToList)
+import           DebugShow                  (trace_)
+import           System.Directory           (doesDirectoryExist, doesFileExist,
+                                             getDirectoryContents,
+                                             getModificationTime,
+                                             isSymbolicLink)
+import           System.FilePath            ((</>))
+import           System.IO                  (Handle,
+                                             IOMode (AppendMode, WriteMode),
+                                             hClose, hGetContents, openFile,
+                                             stdin, stdout)
+import           Tags                       (FileData (..), FileName,
+                                             FoundThing (..),
+                                             FoundThingType (FTClass, FTCons, FTConsAccessor, FTConsGADT, FTData, FTDataGADT, FTFuncImpl, FTFuncTypeDef, FTInstance, FTModule, FTNewtype, FTPattern, FTPatternTypeDef, FTType),
+                                             Pos (..), Scope, mywords,
+                                             writectagsfile, writeetagsfile)
+import           Text.JSON.Generic          (decodeJSON, encodeJSON)
 
 -- search for definitions of things
 -- we do this by looking for the following patterns:
@@ -138,16 +125,16 @@ data Token = Token String Pos
 instance Show Token where
   -- show (Token t (Pos _ l _ _) ) = "Token " ++ t ++ " " ++ (show l)
   show (Token t (Pos _ _l _ _) ) = " " ++ t ++ " "
-  show (NewLine i) = "NewLine " ++ show i
+  show (NewLine i)               = "NewLine " ++ show i
 
 tokenString :: Token -> String
 tokenString (Token s _) = s
 tokenString (NewLine _) = "\n"
 
 isNewLine :: Maybe Int -> Token -> Bool
-isNewLine Nothing (NewLine _) = True
+isNewLine Nothing (NewLine _)   = True
 isNewLine (Just c) (NewLine c') = c == c'
-isNewLine _ _ = False
+isNewLine _ _                   = False
 
 trimNewlines :: [Token] -> [Token]
 trimNewlines = filter (not . isNewLine Nothing)
@@ -225,7 +212,7 @@ findThingsInBS ignoreCloseImpl filename bs = do
                   emptyLine = all (all isSpace . tokenString)
                             . filter (not . isNewLine Nothing)
                   cppLine (_nl:t:_) = ("#" `isPrefixOf`) $ tokenString t
-                  cppLine _ = False
+                  cppLine _         = False
                 in filter (not . emptyLine) . filter (not . cppLine)
 
         let debugStep m = (\s -> trace_ (m ++ " result") s s)
@@ -278,7 +265,7 @@ findThingsInBS ignoreCloseImpl filename bs = do
                                                && n1 == n2
                                                && areFuncImplsOfSameScope t1 t2)
             areFuncImplsOfSameScope (FTFuncImpl a) (FTFuncImpl b) = a == b
-            areFuncImplsOfSameScope _ _ = False
+            areFuncImplsOfSameScope _ _                           = False
 
         let iCI = if ignoreCloseImpl
               then nubBy (\(FoundThing _ n1 (Pos f1 l1 _ _))
@@ -304,9 +291,9 @@ findThingsInBS ignoreCloseImpl filename bs = do
 
 withline :: FileName -> [String] -> String -> Int -> [Token]
 withline filename sourceWords fullline i =
-  let countSpaces (' ':xs) = 1 + countSpaces xs
+  let countSpaces (' ':xs)  = 1 + countSpaces xs
       countSpaces ('\t':xs) = 8 + countSpaces xs
-      countSpaces _ = 0
+      countSpaces _         = 0
   in NewLine (countSpaces fullline)
       : zipWith (\w t -> Token w (Pos filename i t fullline)) sourceWords [1 ..]
 
@@ -314,7 +301,7 @@ withline filename sourceWords fullline i =
 
 stripslcomments :: [[Token]] -> [[Token]]
 stripslcomments = let f (NewLine _ : Token ('-':'-':_) _ : _) = False
-                      f _ = True
+                      f _                                     = True
                   in filter f
 
 stripblockcomments :: [Token] -> [Token]
@@ -382,7 +369,7 @@ findstuff tokens@(Token "class" _ : xs) _ =
           maybe [] (\n@(FoundThing _ name _) -> n : fromWhereOn r (Just (FTClass, name))) $
               className ys
     where isParenOpen (Token "(" _) = True
-          isParenOpen _ = False
+          isParenOpen _             = False
           className lst
             = case (head'
                   . dropWhile isParenOpen
@@ -390,7 +377,7 @@ findstuff tokens@(Token "class" _ : xs) _ =
                   . takeWhile ((not . (`elem` ["=>", utf8_to_char8_hack "⇒"])) . tokenString)
                   . reverse) lst of
               (Just (Token name p)) -> Just $ FoundThing FTClass name p
-              _ -> Nothing
+              _                     -> Nothing
 findstuff tokens@(Token "instance" _ : xs) _ =
         trace_  "findstuff instance" tokens $
         case (break ((== "where").tokenString) xs) of
@@ -426,7 +413,7 @@ findFuncTypeDefs found xs@(Token "(" _ :_) scope =
               in findFuncTypeDefs found (merged : xs') scope
             _ -> []
     where myBreakF (Token ")" _) = True
-          myBreakF _ = False
+          myBreakF _             = False
 findFuncTypeDefs _ _ _ = []
 
 fromWhereOn :: [Token] -> Scope -> [FoundThing]
@@ -443,7 +430,7 @@ fromWhereOn (_:xw) scope = findstuff xw scope
 findFunc :: [Token] -> Scope -> [FoundThing]
 findFunc x scope = case findInfix x scope of
     a@(_:_) -> a
-    _ -> findF x scope
+    _       -> findF x scope
 
 findInfix :: [Token] -> Scope -> [FoundThing]
 findInfix x scope
@@ -451,7 +438,7 @@ findInfix x scope
        ((/= "`"). tokenString)
        (takeWhile ( (/= "=") . tokenString) x) of
      _ : Token name p : _ -> [FoundThing (FTFuncImpl scope) name p]
-     _ -> []
+     _                    -> []
 
 
 findF :: [Token] -> Scope -> [FoundThing]
@@ -464,11 +451,11 @@ findF _ _ = []
 
 head' :: [a] -> Maybe a
 head' (x:_) = Just x
-head' [] = Nothing
+head' []    = Nothing
 
 tail' :: [a] -> [a]
 tail' (_:xs) = xs
-tail' [] = []
+tail' []     = []
 
 -- get the constructor definitions, knowing that a datatype has just started
 
@@ -553,12 +540,12 @@ concatTokens = smartUnwords . map (\(Token name _) -> name) .
   where smartUnwords [] = []
         smartUnwords a = foldr (\v -> (glueNext v ++)) "" $ a `zip` tail (a ++ [""])
         glueNext (a@("("), _) = a
-        glueNext (a, ")") = a
+        glueNext (a, ")")     = a
         glueNext (a@("["), _) = a
-        glueNext (a, "]") = a
-        glueNext (a, ",") = a
-        glueNext (a, "") = a
-        glueNext (a, _) = a ++ " "
+        glueNext (a, "]")     = a
+        glueNext (a, ",")     = a
+        glueNext (a, "")      = a
+        glueNext (a, _)       = a ++ " "
         stripilcomments = fst .
           foldl (\(a, c) v -> case v of
                                 Token ('-':'-':_) _ -> (a, True)

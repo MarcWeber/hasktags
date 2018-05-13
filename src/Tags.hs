@@ -3,11 +3,11 @@
 -- this should be moved into its own library (after cleaning up most of it ..)
 -- yes, this is still specific to hasktags :(
 module Tags where
-import Data.Char ( isSpace )
-import Data.List ( sortBy )
-import Data.Data ( Data, Typeable )
-import System.IO ( Handle, hPutStrLn, hPutStr )
-import Control.Monad ( when )
+import           Control.Monad (when)
+import           Data.Char     (isSpace)
+import           Data.Data     (Data, Typeable)
+import           Data.List     (sortBy)
+import           System.IO     (Handle, hPutStr, hPutStrLn)
 
 -- my words is mainly copied from Data.List.
 -- difference abc::def is recognized as three words
@@ -82,9 +82,9 @@ data FoundThingType
 
 instance Show FoundThingType where
   show (FTFuncTypeDef s (Just (FTClass, p))) =
-      "ft\t" ++ "signature:(" ++ s ++ ")\t" ++ "class:" ++ p 
+      "ft\t" ++ "signature:(" ++ s ++ ")\t" ++ "class:" ++ p
   show (FTFuncTypeDef s (Just (FTInstance, p))) =
-      "ft\t" ++ "signature:(" ++ s ++ ")\t" ++ "instance:" ++ p 
+      "ft\t" ++ "signature:(" ++ s ++ ")\t" ++ "instance:" ++ p
   show (FTFuncTypeDef s _) = "ft\t" ++ "signature:(" ++ s ++ ")"
   show (FTFuncImpl (Just (FTClass, p)))= "fi\t" ++ "class:" ++ p
   show (FTFuncImpl (Just (FTInstance, p)))= "fi\t" ++ "instance:" ++ p
@@ -118,9 +118,9 @@ getfoundthings :: FileData -> [FoundThing]
 getfoundthings (FileData _ things) = things
 
 ctagEncode :: Char -> String
-ctagEncode '/' = "\\/"
+ctagEncode '/'  = "\\/"
 ctagEncode '\\' = "\\\\"
-ctagEncode a = [a]
+ctagEncode a    = [a]
 
 -- | Dump found tag in normal or extended (read : vim like) ctag
 -- line
