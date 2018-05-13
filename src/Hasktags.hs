@@ -106,7 +106,6 @@ getOutFile defaultName openMode []                 = openFile
                                                      openMode
 
 data Mode = ExtendedCtag
-          | IgnoreCloseImpl
           | ETags
           | CTags
           | BothTags
@@ -146,9 +145,7 @@ generate modes filenames = do
       openFileMode = if Append `elem` modes
                      then AppendMode
                      else WriteMode
-  filedata <- mapM (findWithCache (CacheFiles `elem` modes)
-                                  (IgnoreCloseImpl `elem` modes))
-                   filenames
+  filedata <- mapM (findWithCache (CacheFiles `elem` modes)) filenames
 
   when (mode == CTags)
        (do ctagsfile <- getOutFile "tags" openFileMode modes
@@ -172,8 +169,8 @@ generate modes filenames = do
 
 -- Find the definitions in a file, or load from cache if the file
 -- hasn't changed since last time.
-findWithCache :: Bool -> Bool -> FileName -> IO FileData
-findWithCache cache ignoreCloseImpl filename = do
+findWithCache ::  Bool -> FileName -> IO FileData
+findWithCache cache filename = do
   cacheExists <- if cache then doesFileExist cacheFilename else return False
   if cacheExists
      then do fileModified <- getModificationTime filename
@@ -187,7 +184,7 @@ findWithCache cache ignoreCloseImpl filename = do
   where cacheFilename = filenameToTagsName filename
         filenameToTagsName = (++"tags") . reverse . dropWhile (/='.') . reverse
         findAndCache = do
-          filedata <- findThings ignoreCloseImpl filename
+          filedata <- findThings filename
           when cache (writeFile cacheFilename (encodeJSON filedata))
           return filedata
 
@@ -200,12 +197,12 @@ utf8_to_char8_hack :: String -> String
 utf8_to_char8_hack = BS.unpack . BS8.fromString
 
 -- Find the definitions in a file
-findThings :: Bool -> FileName -> IO FileData
-findThings ignoreCloseImpl filename =
-  fmap (findThingsInBS ignoreCloseImpl filename) $ BS.readFile filename
+findThings :: FileName -> IO FileData
+findThings filename =
+  fmap (findThingsInBS filename) $ BS.readFile filename
 
-findThingsInBS :: Bool -> String -> BS.ByteString -> FileData
-findThingsInBS ignoreCloseImpl filename bs = do
+findThingsInBS :: String -> BS.ByteString -> FileData
+findThingsInBS filename bs = do
         let aslines = lines $ BS.unpack bs
 
         let stripNonHaskellLines = let
@@ -267,13 +264,11 @@ findThingsInBS ignoreCloseImpl filename bs = do
             areFuncImplsOfSameScope (FTFuncImpl a) (FTFuncImpl b) = a == b
             areFuncImplsOfSameScope _ _                           = False
 
-        let iCI = if ignoreCloseImpl
-              then nubBy (\(FoundThing _ n1 (Pos f1 l1 _ _))
+        let iCI = nubBy (\(FoundThing _ n1 (Pos f1 l1 _ _))
                          (FoundThing _ n2 (Pos f2 l2 _ _))
                          -> f1 == f2
                            && n1 == n2
                            && ((<= 7) $ abs $ l2 - l1))
-              else id
         let things = iCI $ filterAdjacentFuncImpl $ concatMap (flip findstuff Nothing) $
                 map (\s -> trace_ "section in findThingsInBS" s s) sections
         let

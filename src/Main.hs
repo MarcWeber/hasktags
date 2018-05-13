@@ -1,16 +1,16 @@
 {-# LANGUAGE CPP #-}
 
 module Main (main) where
-import Hasktags
+import           Hasktags
 
-import System.Environment
+import           System.Environment
 
-import Data.List
+import           Data.List
 
-import System.Directory
-import System.Console.GetOpt
-import System.Exit
-import Control.Monad
+import           Control.Monad
+import           System.Console.GetOpt
+import           System.Directory
+import           System.Exit
 
 hsSuffixesDefault :: Mode
 hsSuffixesDefault =  HsSuffixes [ ".hs", ".lhs", ".hsc" ]
@@ -26,10 +26,6 @@ options = [ Option "c" ["ctags"]
               (NoArg Append)
             $ "append to existing CTAGS and/or ETAGS file(s). Afterward this "
               ++ "file will no longer be sorted!"
-          , Option "" ["ignore-close-implementation"]
-              (NoArg IgnoreCloseImpl)
-            $ "ignores found implementation if it is closer than 7 lines - so "
-              ++ "you can jump to definition in one shot"
           , Option "o" ["output"]
             (ReqArg OutRedir "")
             "output to given file, instead of 'tags', '-' file is stdout"
@@ -44,11 +40,11 @@ options = [ Option "c" ["ctags"]
           , Option "R" ["tags-absolute"] (NoArg AbsolutePath) "make tags paths absolute. Useful when setting tags files in other directories"
           , Option "h" ["help"] (NoArg Help) "This help"
           ]
-  where suffStr Nothing = hsSuffixesDefault
+  where suffStr Nothing  = hsSuffixesDefault
         suffStr (Just s) = HsSuffixes $ strToSuffixes s
         strToSuffixes = lines . map commaToEOL
         commaToEOL ',' = '\n'
-        commaToEOL x = x
+        commaToEOL x   = x
 
 
 main :: IO ()
