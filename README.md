@@ -76,26 +76,25 @@ See cabal file
 Alex no longer supports bird style ">", so should we drop support, too?
 
 ## Contributors
-Jack Henahan (maintainer)
-Marc Weber
-Marco Túlio Pimenta Gontijo
-Nikolay Yakimov
-Alois Cochard
-Liyang HU
-Ben Gamari
-Chris Done
-Marco Túlio Gontijo e Silva
-Chris Stryczynski
-Max Nordlund gmail
-Kwang Yul Seo
-Pedro Rodriguez
-Thomas Miedema
-Vincent B
-dnhgff
-Alexey Radkov
-Michael Baikov
-Magnus Therning
-Felix Gruber
+- Jack Henahan (maintainer)
+- Marc Weber
+- Marco Túlio Pimenta Gontijo
+- Nikolay Yakimov
+- Alois Cochard
+- Liyang HU
+- Ben Gamari
+- Chris Done
+- Chris Stryczynski
+- Max Nordlund gmail
+- Kwang Yul Seo
+- Pedro Rodriguez
+- Thomas Miedema
+- Vincent B
+- dnhgff
+- Alexey Radkov
+- Michael Baikov
+- Magnus Therning
+- Felix Gruber
 
 ## TODO
 Add all people having contributed before Oct 2012
