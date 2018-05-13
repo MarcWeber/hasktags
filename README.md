@@ -36,7 +36,7 @@ let tags+=tagfile " tags,TAGS is the default setting so probably you don't have 
 ```
 `:tjump foo<tab>` or such. See `:h` tags
 
-You can use a configuration like [../assets/hasktags.vim](this one)
+You can use a configuration like [https://github.com/MarcWeber/hasktags/blob/assets/hasktags.vim](this one)
 with [https://github.com/majutsushi/tagbar](Tagbar) to produce a
 tagbar like this:
 
