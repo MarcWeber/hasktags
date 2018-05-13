@@ -10,3 +10,5 @@ Setup
 TAGS
 tags
 ctags
+dist-newstyle/
+.ghc.environment*
