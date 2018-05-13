@@ -25,11 +25,11 @@ import           DebugShow                  (trace_)
 import           System.Directory           (doesDirectoryExist, doesFileExist,
                                              getDirectoryContents,
                                              getModificationTime,
-                                             #if MIN_VERSION_directory(1,3,0)
+#if MIN_VERSION_directory(1,3,0)
                                               pathIsSymbolicLink)
-                                             #else
+#else
                                               isSymbolicLink)
-                                             #endif
+#endif
 import           System.FilePath            ((</>))
 import           System.IO                  (Handle,
                                              IOMode (AppendMode, WriteMode),
@@ -526,11 +526,11 @@ dirToFiles :: Bool -> [String] -> FilePath -> IO [ FilePath ]
 dirToFiles _ _ "STDIN" = fmap lines $ hGetContents stdin
 dirToFiles followSyms suffixes p = do
   isD <- doesDirectoryExist p
-  #if MIN_VERSION_directory(1,3,0)
+#if MIN_VERSION_directory(1,3,0)
   isSymLink <- pathIsSymbolicLink p
-  #else
+#else
   isSymLink <- isSymbolicLink p
-  #endif
+#endif
   case isD of
     False -> return $ if matchingSuffix then [p] else []
     True ->
