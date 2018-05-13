@@ -42,6 +42,10 @@ extra-source-files:
   testcases/testcase11.hs
   testcases/simple.hs
   testcases/monad-base-control.hs
+  testcases/16.hs
+  testcases/16-regression.hs
+  testcases/9.hs
+  testcases/9-too.hs
 
 Flag debug
   Default: False
