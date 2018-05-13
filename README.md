@@ -14,12 +14,12 @@ Build hasktags (standard cabal build)
 
 Ctag format:
 ```bash
-hasktags --ignore-close-implementation --ctags .
+hasktags --ctags .
 ```
 
 Etag format (used by emacs):
 ```bash
-hasktags --ignore-close-implementation --etags .
+hasktags --etags .
 ```
 
 Both formats:
@@ -35,6 +35,14 @@ hasktags --ignore-close-implementation .
 let tags+=tagfile " tags,TAGS is the default setting so probably you don't have to do anything
 ```
 `:tjump foo<tab>` or such. See `:h` tags
+
+You can use a configuration like [../assets/hasktags.vim](this one)
+with [https://github.com/majutsushi/tagbar](Tagbar) to produce a
+tagbar like this:
+
+![Tagbar1](../assets/tagbar1.png?raw=true) ![Tagbar2](../assets/tagbar2.png?raw=true)
+
+Enormous thanks to Alexey Radkov for the hierarchical design necessary for this usage.
 
 ### NEdit
 Load the "tags" file using File/Load Tags File.
@@ -68,8 +76,26 @@ See cabal file
 Alex no longer supports bird style ">", so should we drop support, too?
 
 ## Contributors
-- Tsuru Capital (github/liyang)
-- Marco Túlio Pimenta Gontijo (github/marcotmarcot)
+Jack Henahan (maintainer)
+Marc Weber
+Marco Túlio Pimenta Gontijo
+Nikolay Yakimov
+Alois Cochard
+Liyang HU
+Ben Gamari
+Chris Done
+Marco Túlio Gontijo e Silva
+Chris Stryczynski
+Max Nordlund gmail
+Kwang Yul Seo
+Pedro Rodriguez
+Thomas Miedema
+Vincent B
+dnhgff
+Alexey Radkov
+Michael Baikov
+Magnus Therning
+Felix Gruber
 
 ## TODO
 Add all people having contributed before Oct 2012
@@ -77,9 +103,8 @@ This includes people contributing to the darcs repository as well as people
 having contributed when this repository has been part of ghc
 
 # Related work
-List taken from announce of lushtags.
 - https://github.com/bitc/lushtags
-- http://hackage.haskell.org/package/hasktags
+- https://github.com/elaforge/fast-tags
 - http://kingfisher.nfshost.com/sw/gasbag/
 - http://hackage.haskell.org/package/hothasktags
 - http://majutsushi.github.com/tagbar/
