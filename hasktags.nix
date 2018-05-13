@@ -1,5 +1,5 @@
 { mkDerivation, base, bytestring, directory, filepath, HUnit, json
-, stdenv, utf8-string
+, microlens-platform, stdenv, utf8-string
 }:
 mkDerivation {
   pname = "hasktags";
@@ -8,11 +8,13 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    base bytestring directory filepath json utf8-string
+    base bytestring directory filepath json microlens-platform
+    utf8-string
   ];
   executableHaskellDepends = [ base directory filepath ];
   testHaskellDepends = [
-    base bytestring directory filepath HUnit json utf8-string
+    base bytestring directory filepath HUnit json microlens-platform
+    utf8-string
   ];
   homepage = "http://github.com/MarcWeber/hasktags";
   description = "Produces ctags \"tags\" and etags \"TAGS\" files for Haskell programs";
