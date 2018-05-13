@@ -1,8 +1,8 @@
 -- to be found Main
 -- to be found ABC
 -- to be found ABCD
--- to be found @=?
--- to be found @=:
+-- to be found (@=?)
+-- to be found (@=:)
 -- to be found dummy
 -- to be found main
 module Main where

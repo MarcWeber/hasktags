@@ -57,7 +57,7 @@ module A.B.testcase(module System.FilePath.Windows) where
 
 -- TODO 
 
-    -- to be found =~
+    -- to be found (=~)
     (=~)   :: (Regex rho) => String -> rho -> Bool
 
 
