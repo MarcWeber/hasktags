@@ -23,7 +23,6 @@ extra-source-files:
   testcases/Repair.lhs
   testcases/blockcomment.hs
   testcases/constructor.hs
-  testcases/firstconstructor.hs
   testcases/module.hs
   testcases/space.hs
   testcases/substring.hs

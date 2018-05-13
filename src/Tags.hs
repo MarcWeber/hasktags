@@ -182,11 +182,6 @@ etagsDumpFileData (FileData filename things) =
           thingslength = length thingsdump
 
 etagsDumpThing :: FoundThing -> String
-etagsDumpThing (FoundThing _ name  pos) =
-  let wrds = mywords True (pos^.lineContent)
-      token = pos^.tokenNumber
-      line = pos^.lineNumber
-  in concat (take token wrds ++ map (take 1) (take 1 $ drop token wrds))
-        ++ "\x7f"
-        ++ name ++ "\x01"
-        ++ show line ++ "," ++ show (line + 1) ++ "\n"
+etagsDumpThing (FoundThing _ name pos) =
+  let line = pos^.lineNumber
+  in concat [name, "\x7f", name, "\x01", show line, ",", show (line + 1), "\n"]

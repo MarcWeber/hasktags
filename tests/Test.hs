@@ -1,16 +1,16 @@
 module Main where
 
-import Hasktags
-import Tags
+import           Hasktags
+import           Tags
 
-import Control.Monad
-import Data.List
-import System.Directory
-import System.Exit
+import           Control.Monad
+import           Data.List
+import           System.Directory
+import           System.Exit
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 
-import Test.HUnit
+import           Test.HUnit
 
 {- TODO
 Test the library (recursive, caching, ..)
@@ -72,7 +72,7 @@ createTestCase :: FilePath -> IO Test
 createTestCase filename = do
   bs <- BS.readFile filename
   let lns = BS.lines bs
-  let fd = findThingsInBS True filename bs
+  let fd = findThingsInBS filename bs
   let FileData _ things = fd
 
   let foundTagNames = [name | FoundThing _ name _ <- things]

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -- should this be named Data.Hasktags or such?
 module Hasktags (
   FileData,
@@ -24,7 +25,11 @@ import           DebugShow                  (trace_)
 import           System.Directory           (doesDirectoryExist, doesFileExist,
                                              getDirectoryContents,
                                              getModificationTime,
-                                             isSymbolicLink)
+                                             #if MIN_VERSION_directory(1,3,0)
+                                              pathIsSymbolicLink)
+                                             #else
+                                              isSymbolicLink)
+                                             #endif
 import           System.FilePath            ((</>))
 import           System.IO                  (Handle,
                                              IOMode (AppendMode, WriteMode),
@@ -345,7 +350,7 @@ findstuff tokens@(Token "newtype" _ : ts@(Token name pos : _))_  =
         FoundThing FTNewtype name pos
           : getcons (FTCons FTNewtype name) (trimNewlines ts)-- ++ (findstuff xs)
         -- FoundThing FTNewtype name pos : findstuff xs
-findstuff tokens@(Token "type" _ : Token name pos : xs) scope =
+findstuff tokens@(Token "type" _ : Token name pos : xs) _ =
         trace_  "findstuff type" tokens $
         case (break ((== "where").tokenString) xs) of
         (ys, []) ->
@@ -383,10 +388,10 @@ findstuff tokens@(Token "instance" _ : xs) _ =
           trace_ "findstuff instance b2 " (ys, r) $
           maybe [] (\n@(FoundThing _ name _) -> n : fromWhereOn r (Just (FTInstance, name))) $
               instanceName ys
-    where instanceName [] = Nothing
-          instanceName lst@(Token _ p :_) = Just $ FoundThing FTInstance
+    where instanceName lst@(Token _ p :_) = Just $ FoundThing FTInstance
             (map (\a -> if a == '.' then '-' else a) $ concatTokens lst) p
-findstuff tokens@(Token "pattern" _ : Token name pos : Token "::" _ : sig) scope =
+          instanceName _ = Nothing
+findstuff tokens@(Token "pattern" _ : Token name pos : Token "::" _ : sig) _ =
         trace_ "findstuff pattern type annotation" tokens $
         [FoundThing (FTPatternTypeDef (concatTokens sig)) name pos]
 findstuff tokens@(Token "pattern" _ : Token name pos : xs) scope =
@@ -517,7 +522,11 @@ dirToFiles :: Bool -> [String] -> FilePath -> IO [ FilePath ]
 dirToFiles _ _ "STDIN" = fmap lines $ hGetContents stdin
 dirToFiles followSyms suffixes p = do
   isD <- doesDirectoryExist p
+  #if MIN_VERSION_directory(1,3,0)
+  isSymLink <- pathIsSymbolicLink p
+  #else
   isSymLink <- isSymbolicLink p
+  #endif
   case isD of
     False -> return $ if matchingSuffix then [p] else []
     True ->
