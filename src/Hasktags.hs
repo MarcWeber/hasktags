@@ -269,11 +269,15 @@ findThingsInBS filename bs = do
             areFuncImplsOfSameScope (FTFuncImpl a) (FTFuncImpl b) = a == b
             areFuncImplsOfSameScope _ _                           = False
 
-        let iCI = nubBy (\(FoundThing _ n1 (Pos f1 l1 _ _))
-                         (FoundThing _ n2 (Pos f2 l2 _ _))
+        let iCI = nubBy (\(FoundThing t1 n1 (Pos f1 l1 _ _))
+                         (FoundThing t2 n2 (Pos f2 l2 _ _))
                          -> f1 == f2
                            && n1 == n2
+                           && skipCons t1 t2
                            && ((<= 7) $ abs $ l2 - l1))
+            skipCons FTData (FTCons _ _) = False
+            skipCons FTDataGADT (FTConsGADT _) = False
+            skipCons _ _ = True
         let things = iCI $ filterAdjacentFuncImpl $ concatMap (flip findstuff Nothing) $
                 map (\s -> trace_ "section in findThingsInBS" s s) sections
         let
