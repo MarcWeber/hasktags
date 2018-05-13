@@ -25,9 +25,9 @@ import Tags
       mywords,
       writectagsfile,
       writeetagsfile )
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy.Char8 as BS
     ( ByteString, unpack, readFile )
-import qualified Data.ByteString.UTF8 as BS8 ( fromString )
+import qualified Data.ByteString.Lazy.UTF8 as BS8 ( fromString )
 import Data.Char ( isSpace )
 import Data.List ( tails, nubBy, isSuffixOf, isPrefixOf )
 import Data.Maybe ( maybeToList )
