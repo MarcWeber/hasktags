@@ -121,6 +121,7 @@ data Mode = ExtendedCtag
           | Help
           | HsSuffixes [String]
           | AbsolutePath
+          | Version
           deriving (Ord, Eq, Show)
 
 data Token = Token String Pos

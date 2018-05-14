@@ -1,5 +1,9 @@
 {-# LANGUAGE CPP #-}
 
+#ifndef CURRENT_PACKAGE_VERSION
+#define CURRENT_PACKAGE_VERSION "unknown"
+#endif
+
 module Main (main) where
 import           Hasktags
 
@@ -39,6 +43,7 @@ options = [ Option "c" ["ctags"]
           , Option "S" ["suffixes"] (OptArg suffStr ".hs,.lhs") "list of hs suffixes including \".\""
           , Option "R" ["tags-absolute"] (NoArg AbsolutePath) "make tags paths absolute. Useful when setting tags files in other directories"
           , Option "h" ["help"] (NoArg Help) "This help"
+          , Option "v" ["version"] (NoArg Version) "print the version of hasktags and exit"
           ]
   where suffStr Nothing  = hsSuffixesDefault
         suffStr (Just s) = HsSuffixes $ strToSuffixes s
@@ -77,6 +82,10 @@ main = do
 
         filenames
           <- liftM (nub . concat) $ mapM (dirToFiles followSymLinks hsSuffixes) files_or_dirs
+
+        when (elem Version modes)
+            (do putStrLn CURRENT_PACKAGE_VERSION
+                exitSuccess)
 
         when (errs /= [] || elem Help modes || files_or_dirs == [])
              (do putStr $ unlines errs
