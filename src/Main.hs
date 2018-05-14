@@ -11,6 +11,8 @@ import           Control.Monad
 import           System.Console.GetOpt
 import           System.Directory
 import           System.Exit
+import Data.Version (showVersion)
+import Paths_hasktags (version)
 
 hsSuffixesDefault :: Mode
 hsSuffixesDefault =  HsSuffixes [ ".hs", ".lhs", ".hsc" ]
@@ -52,7 +54,7 @@ main = do
         progName <- getProgName
         args <- getArgs
         let usageString =
-                   "Usage: " ++ progName
+                   "Usage: " ++ progName ++ " " ++ showVersion version
                 ++ " [OPTION...] [files or directories...]\n"
                 ++ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs\n"
                 ++ "Thus hasktags . tags all important files in the current\n"
@@ -86,3 +88,7 @@ main = do
         when (filenames == []) $ putStrLn "warning: no files found!"
 
         generate modes filenames
+
+-- Local Variables:
+-- dante-target: "exe:hasktags"
+-- End:
