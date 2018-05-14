@@ -12,3 +12,5 @@ tags
 ctags
 dist-newstyle/
 .ghc.environment*
+.styx
+cabal.sandbox.config
