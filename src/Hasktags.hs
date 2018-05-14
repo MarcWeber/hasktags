@@ -18,7 +18,7 @@ import           Control.Monad              (when)
 import qualified Data.ByteString.Lazy.Char8 as BS (ByteString, readFile, unpack)
 import qualified Data.ByteString.Lazy.UTF8  as BS8 (fromString)
 import           Data.Char                  (isSpace)
-import           Data.List                  (isPrefixOf, isSuffixOf, nubBy,
+import           Data.List                  (isPrefixOf, isSuffixOf, groupBy,
                                              tails)
 import           Data.Maybe                 (maybeToList)
 import           DebugShow                  (trace_)
@@ -254,30 +254,30 @@ findThingsInBS filename bs = do
         --     z = 20
         -- won't be found as function
         let topLevelIndent = debugStep "top level indent" $ getTopLevelIndent isLiterate tokenLines
-        let sections = map tail -- strip leading NL (no longer needed
+        let sections = map tail -- strip leading NL (no longer needed)
                        $ filter (not . null)
                        $ splitByNL (Just (topLevelIndent) )
                        $ concat (trace_ "tokenLines" tokenLines tokenLines)
         -- only take one of
         -- a 'x' = 7
         -- a _ = 0
-        let filterAdjacentFuncImpl = nubBy (\(FoundThing t1 n1 (Pos f1 _ _ _))
-                                             (FoundThing t2 n2 (Pos f2 _ _ _))
-                                             -> f1 == f2
-                                               && n1 == n2
-                                               && areFuncImplsOfSameScope t1 t2)
-            areFuncImplsOfSameScope (FTFuncImpl a) (FTFuncImpl b) = a == b
-            areFuncImplsOfSameScope _ _                           = False
+        let filterAdjacentFuncImpl = map head . groupBy (\(FoundThing t1 n1 (Pos f1 _ _ _))
+                                                          (FoundThing t2 n2 (Pos f2 _ _ _))
+                                                          -> f1 == f2
+                                                            && n1 == n2
+                                                            && areFuncImpls t1 t2)
+            areFuncImpls (FTFuncImpl _) (FTFuncImpl _) = True
+            areFuncImpls _ _                           = False
 
-        let iCI = nubBy (\(FoundThing t1 n1 (Pos f1 l1 _ _))
-                         (FoundThing t2 n2 (Pos f2 l2 _ _))
-                         -> f1 == f2
-                           && n1 == n2
-                           && skipCons t1 t2
-                           && ((<= 7) $ abs $ l2 - l1))
-            skipCons FTData (FTCons _ _) = False
+        let iCI = map head . groupBy (\(FoundThing t1 n1 (Pos f1 l1 _ _))
+                                       (FoundThing t2 n2 (Pos f2 l2 _ _))
+                                       -> f1 == f2
+                                         && n1 == n2
+                                         && skipCons t1 t2
+                                         && ((<= 7) $ abs $ l2 - l1))
+            skipCons FTData (FTCons _ _)       = False
             skipCons FTDataGADT (FTConsGADT _) = False
-            skipCons _ _ = True
+            skipCons _ _                       = True
         let things = iCI $ filterAdjacentFuncImpl $ concatMap (flip findstuff Nothing) $
                 map (\s -> trace_ "section in findThingsInBS" s s) sections
         let
@@ -306,7 +306,9 @@ withline filename sourceWords fullline i =
 stripslcomments :: [[Token]] -> [[Token]]
 stripslcomments = let f (NewLine _ : Token ('-':'-':_) _ : _) = False
                       f _                                     = True
-                  in filter f
+                      isCmt (Token ('-':'-':_) _)             = True
+                      isCmt _                                 = False
+                  in map (takeWhile (not . isCmt)) . filter f
 
 stripblockcomments :: [Token] -> [Token]
 stripblockcomments (Token "{-" pos : xs) =
@@ -543,8 +545,7 @@ dirToFiles followSyms suffixes p = do
   where matchingSuffix = any (`isSuffixOf` p) suffixes
 
 concatTokens :: [Token] -> String
-concatTokens = smartUnwords . map (\(Token name _) -> name) .
-  filter (not . isNewLine Nothing) . stripilcomments
+concatTokens = smartUnwords . map (\(Token name _) -> name) .  filter (not . isNewLine Nothing)
   where smartUnwords [] = []
         smartUnwords a = foldr (\v -> (glueNext v ++)) "" $ a `zip` tail (a ++ [""])
         glueNext (a@("("), _) = a
@@ -554,12 +555,6 @@ concatTokens = smartUnwords . map (\(Token name _) -> name) .
         glueNext (a, ",")     = a
         glueNext (a, "")      = a
         glueNext (a, _)       = a ++ " "
-        stripilcomments = fst .
-          foldl (\(a, c) v -> case v of
-                                Token ('-':'-':_) _ -> (a, True)
-                                NewLine _ -> (a ++ [v], False)
-                                _ -> if c then (a, c) else (a ++ [v], c)
-                ) ([], False)
 
 extractOperator :: [Token] -> (String, [Token])
 extractOperator ts@(Token "(" _ : _) =
