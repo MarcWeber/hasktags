@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE RecordWildCards #-}
+
 -- should this be named Data.Hasktags or such?
 module Hasktags (
   FileData,
@@ -7,8 +9,9 @@ module Hasktags (
   findThingsInBS,
 
   Mode(..),
+  TagsFile(..),
+  Tags(..),
   --  TODO think about these: Must they be exported ?
-  getMode,
   getOutFile,
 
   dirToFiles
@@ -18,20 +21,22 @@ import           Control.Arrow              ((***))
 import qualified Data.ByteString.Lazy.Char8 as BS (ByteString, readFile, unpack)
 import qualified Data.ByteString.Lazy.UTF8  as BS8 (fromString)
 import           Data.Char                  (isSpace)
+import           Data.String                (IsString(..))
 import           Data.List                  (isPrefixOf, isSuffixOf, groupBy,
-                                             tails)
+                                             tails, nub)
 import           Data.Maybe                 (maybeToList)
 import           DebugShow                  (trace_)
 import           System.Directory           (doesDirectoryExist, doesFileExist,
                                              getDirectoryContents,
                                              getModificationTime,
+                                             canonicalizePath,
 #if MIN_VERSION_directory(1,3,0)
                                               pathIsSymbolicLink)
 #else
                                               isSymbolicLink)
 #endif
 import           System.FilePath            ((</>))
-import           System.IO                  (Handle, IOMode(AppendMode, WriteMode), hClose, openFile, stdout)
+import           System.IO                  (Handle, IOMode, hClose, openFile, stdout)
 import           Tags                       (FileData (..), FileName,
                                              FoundThing (..),
                                              FoundThingType (FTClass, FTCons, FTConsAccessor, FTConsGADT, FTData, FTDataGADT, FTFuncImpl, FTFuncTypeDef, FTInstance, FTModule, FTNewtype, FTPattern, FTPatternTypeDef, FTType),
@@ -89,36 +94,40 @@ Really not a easy question - maybe there is an answer - I don't know
 -- Reference: http://ctags.sourceforge.net/FORMAT
 
 
--- | getMode takes a list of modes and extracts the mode with the
---   highest precedence.  These are as follows: Both, CTags, ETags
---   The default case is Both.
-getMode :: [Mode] -> Mode
-getMode [] = BothTags
-getMode xs = maximum xs
-
 -- | getOutFile scans the modes searching for output redirection
 --   if not found, open the file with name passed as parameter.
 --   Handle special file -, which is stdout
-getOutFile :: String -> IOMode -> [Mode] -> IO Handle
-getOutFile _           _        (OutRedir "-" : _) = return stdout
-getOutFile _           openMode (OutRedir f : _)   = openFile f openMode
-getOutFile name        openMode (_:xs)             = getOutFile name openMode xs
-getOutFile defaultName openMode []                 = openFile
-                                                     defaultName
-                                                     openMode
+getOutFile :: String -> IOMode -> IO Handle
+getOutFile filepath openMode
+  | "-" == filepath = return stdout
+  | otherwise       = openFile filepath openMode
 
-data Mode = ExtendedCtag
-          | ETags
-          | CTags
-          | BothTags
-          | Append
-          | OutRedir String
-          | CacheFiles
-          | FollowDirectorySymLinks
-          | Help
-          | HsSuffixes [String]
-          | AbsolutePath
-          deriving (Ord, Eq, Show)
+data TagsFile = TagsFile
+  { _ctagsFile :: FilePath
+  , _etagsFile :: FilePath
+  }
+
+instance Show TagsFile where
+  show TagsFile{..} = "ctags: " ++ _ctagsFile ++ ", etags: " ++ _etagsFile
+
+instance IsString TagsFile where
+  fromString s = TagsFile s s
+
+data Tags =
+    Ctags
+  | Etags
+  | Both
+
+data Mode = Mode
+  { _tags             :: Tags
+  , _extendedCtag     :: Bool
+  , _appendTags       :: IOMode
+  , _outputFile       :: TagsFile
+  , _cacheData        :: Bool
+  , _followSymlinks   :: Bool
+  , _suffixes         :: [String]
+  , _absoluteTagPaths :: Bool
+  }
 
 data Token = Token String Pos
             | NewLine Int -- space 8*" " = "\t"
@@ -140,34 +149,28 @@ isNewLine _ _                   = False
 trimNewlines :: [Token] -> [Token]
 trimNewlines = filter (not . isNewLine Nothing)
 
-generate :: [Mode] -> [FileName] -> IO ()
-generate modes filenames = do
+generate :: Mode -> [FilePath] -> IO ()
+generate Mode{..} files = do
+  files_or_dirs <- if _absoluteTagPaths
+                          then mapM canonicalizePath files
+                          else return files
 
-  let mode = getMode (filter ( `elem` [BothTags, CTags, ETags] ) modes)
-      openFileMode = if Append `elem` modes
-                     then AppendMode
-                     else WriteMode
-  filedata <- mapM (findWithCache (CacheFiles `elem` modes)) filenames
+  filenames <- (nub . concat) <$> mapM (dirToFiles _followSymlinks _suffixes) files_or_dirs
 
-  when (mode == CTags)
-       (do ctagsfile <- getOutFile "tags" openFileMode modes
-           writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
-           hClose ctagsfile)
+  filedata <- mapM (findWithCache _cacheData) filenames
 
-  when (mode == ETags)
-       (do etagsfile <- getOutFile "TAGS" openFileMode modes
-           writeetagsfile etagsfile filedata
-           hClose etagsfile)
+  writeTags _tags filedata
 
-  -- avoid problem when both is used in combination
-  -- with redirection on stdout
-  when (mode == BothTags)
-       (do etagsfile <- getOutFile "TAGS" openFileMode modes
-           writeetagsfile etagsfile filedata
-           ctagsfile <- getOutFile "ctags" openFileMode modes
-           writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
-           hClose etagsfile
-           hClose ctagsfile)
+  where
+    writeTags Ctags filedata = writeFile' _ctagsFile (writectagsfile _extendedCtag filedata)
+    writeTags Etags filedata = writeFile' _etagsFile (writeetagsfile filedata)
+    writeTags Both filedata  = writeTags Ctags filedata >> writeTags Etags filedata
+    writeFile' :: FilePath -> (Handle -> IO ()) -> IO ()
+    writeFile' name f = do
+      file <- getOutFile name _appendTags
+      f file
+      hClose file
+    TagsFile{..} = _outputFile
 
 -- Find the definitions in a file, or load from cache if the file
 -- hasn't changed since last time.

@@ -147,8 +147,8 @@ dumpThing cond thing = if cond
                           else normalDump thing
 
 -- stuff for dealing with ctags output format
-writectagsfile :: Handle -> Bool -> [FileData] -> IO ()
-writectagsfile ctagsfile extended filedata = do
+writectagsfile :: Bool -> [FileData] -> Handle -> IO ()
+writectagsfile extended filedata ctagsfile = do
     let things = concatMap getfoundthings filedata
     when extended
          (do hPutStrLn
@@ -171,8 +171,8 @@ sortThings = sortBy comp
 
 -- stuff for dealing with etags output format
 
-writeetagsfile :: Handle -> [FileData] -> IO ()
-writeetagsfile etagsfile = mapM_ (hPutStr etagsfile . etagsDumpFileData)
+writeetagsfile :: [FileData] -> Handle -> IO ()
+writeetagsfile fileData etagsfile = mapM_ (hPutStr etagsfile . etagsDumpFileData) fileData
 
 etagsDumpFileData :: FileData -> String
 etagsDumpFileData (FileData filename things) =
