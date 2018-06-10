@@ -71,21 +71,21 @@ main = do
 #endif
 
         files_or_dirs <- if AbsolutePath `elem` modes
-                             then sequence $ map canonicalizePath files_or_dirs_unexpanded
+                             then mapM canonicalizePath files_or_dirs_unexpanded
                              else return files_or_dirs_unexpanded
-        let hsSuffixes = head $ [ s | (HsSuffixes s) <- modes ++ [hsSuffixesDefault] ]
+        let hsSuffixes = head [ s | (HsSuffixes s) <- modes ++ [hsSuffixesDefault] ]
 
         let followSymLinks = FollowDirectorySymLinks `elem` modes
 
         filenames
-          <- liftM (nub . concat) $ mapM (dirToFiles followSymLinks hsSuffixes) files_or_dirs
+          <- (nub . concat) <$> mapM (dirToFiles followSymLinks hsSuffixes) files_or_dirs
 
-        when (errs /= [] || elem Help modes || files_or_dirs == [])
+        when (errs /= [] || elem Help modes || null files_or_dirs)
              (do putStr $ unlines errs
                  putStr $ usageInfo usageString options
                  exitWith (ExitFailure 1))
 
-        when (filenames == []) $ putStrLn "warning: no files found!"
+        when (null filenames) $ putStrLn "warning: no files found!"
 
         generate modes filenames
 

@@ -7,8 +7,7 @@ module Tags where
 import           Control.Monad       (when)
 import           Data.Char           (isSpace)
 import           Data.Data           (Data, Typeable)
-import           Data.List           (sortBy)
-import           Data.List           (intercalate)
+import           Data.List           (sortBy, intercalate)
 import           Lens.Micro.Platform
 import           System.IO           (Handle, hPutStr, hPutStrLn)
 

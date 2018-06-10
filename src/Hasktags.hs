@@ -3,7 +3,6 @@
 module Hasktags (
   FileData,
   generate,
-  findWithCache,
   findThings,
   findThingsInBS,
 
@@ -15,6 +14,7 @@ module Hasktags (
   dirToFiles
 ) where
 import           Control.Monad              (when)
+import           Control.Arrow              ((***))
 import qualified Data.ByteString.Lazy.Char8 as BS (ByteString, readFile, unpack)
 import qualified Data.ByteString.Lazy.UTF8  as BS8 (fromString)
 import           Data.Char                  (isSpace)
@@ -31,10 +31,7 @@ import           System.Directory           (doesDirectoryExist, doesFileExist,
                                               isSymbolicLink)
 #endif
 import           System.FilePath            ((</>))
-import           System.IO                  (Handle,
-                                             IOMode (AppendMode, WriteMode),
-                                             hClose, hGetContents, openFile,
-                                             stdin, stdout)
+import           System.IO                  (Handle, IOMode(AppendMode, WriteMode), hClose, openFile, stdout)
 import           Tags                       (FileData (..), FileName,
                                              FoundThing (..),
                                              FoundThingType (FTClass, FTCons, FTConsAccessor, FTConsGADT, FTData, FTDataGADT, FTFuncImpl, FTFuncTypeDef, FTInstance, FTModule, FTNewtype, FTPattern, FTPatternTypeDef, FTType),
@@ -204,7 +201,7 @@ utf8_to_char8_hack = BS.unpack . BS8.fromString
 -- Find the definitions in a file
 findThings :: FileName -> IO FileData
 findThings filename =
-  fmap (findThingsInBS filename) $ BS.readFile filename
+  findThingsInBS filename <$> BS.readFile filename
 
 findThingsInBS :: String -> BS.ByteString -> FileData
 findThingsInBS filename bs = do
@@ -217,7 +214,7 @@ findThingsInBS filename bs = do
                   cppLine _         = False
                 in filter (not . emptyLine) . filter (not . cppLine)
 
-        let debugStep m = (\s -> trace_ (m ++ " result") s s)
+        let debugStep m s = trace_ (m ++ " result") s s
 
         let (isLiterate, slines) =
               debugStep "fromLiterate"
@@ -256,7 +253,7 @@ findThingsInBS filename bs = do
         let topLevelIndent = debugStep "top level indent" $ getTopLevelIndent isLiterate tokenLines
         let sections = map tail -- strip leading NL (no longer needed)
                        $ filter (not . null)
-                       $ splitByNL (Just (topLevelIndent) )
+                       $ splitByNL (Just topLevelIndent )
                        $ concat (trace_ "tokenLines" tokenLines tokenLines)
         -- only take one of
         -- a 'x' = 7
@@ -278,8 +275,8 @@ findThingsInBS filename bs = do
             skipCons FTData (FTCons _ _)       = False
             skipCons FTDataGADT (FTConsGADT _) = False
             skipCons _ _                       = True
-        let things = iCI $ filterAdjacentFuncImpl $ concatMap (flip findstuff Nothing) $
-                map (\s -> trace_ "section in findThingsInBS" s s) sections
+        let things = iCI $ filterAdjacentFuncImpl $ concatMap (flip findstuff Nothing .
+                (\s -> trace_ "section in findThingsInBS" s s)) sections
         let
           -- If there's a module with the same name of another definition, we
           -- are not interested in the module, but only in the definition.
@@ -336,8 +333,7 @@ contains sub = any (isPrefixOf sub) . tails
 
 findstuff :: [Token] -> Scope -> [FoundThing]
 findstuff (Token "module" _ : Token name pos : _) _ =
-        trace_ "module" pos $
-        [FoundThing FTModule name pos] -- nothing will follow this section
+        trace_ "module" pos [FoundThing FTModule name pos] -- nothing will follow this section
 findstuff tokens@(Token "data" _ : Token name pos : xs) _
         | any ( (== "where"). tokenString ) xs -- GADT
             -- TODO will be found as FTCons (not FTConsGADT), the same for
@@ -358,15 +354,15 @@ findstuff tokens@(Token "newtype" _ : ts@(Token name pos : _))_  =
         -- FoundThing FTNewtype name pos : findstuff xs
 findstuff tokens@(Token "type" _ : Token name pos : xs) _ =
         trace_  "findstuff type" tokens $
-        case (break ((== "where").tokenString) xs) of
+        case break ((== "where").tokenString) xs of
         (ys, []) ->
-          trace_ "findstuff type b1 " ys $ [FoundThing FTType name pos]
+          trace_ "findstuff type b1 " ys [FoundThing FTType name pos]
         (ys, r) ->
           trace_ "findstuff type b2 " (ys, r) $
           FoundThing FTType name pos : fromWhereOn r Nothing
 findstuff tokens@(Token "class" _ : xs) _ =
         trace_  "findstuff class" tokens $
-        case (break ((== "where").tokenString) xs) of
+        case break ((== "where").tokenString) xs of
         (ys, []) ->
           trace_ "findstuff class b1 " ys $
           maybeToList $ className ys
@@ -386,7 +382,7 @@ findstuff tokens@(Token "class" _ : xs) _ =
               _                     -> Nothing
 findstuff tokens@(Token "instance" _ : xs) _ =
         trace_  "findstuff instance" tokens $
-        case (break ((== "where").tokenString) xs) of
+        case break ((== "where").tokenString) xs of
         (ys, []) ->
           trace_ "findstuff instance b1 " ys $
           maybeToList $ instanceName ys
@@ -398,8 +394,7 @@ findstuff tokens@(Token "instance" _ : xs) _ =
             (map (\a -> if a == '.' then '-' else a) $ concatTokens lst) p
           instanceName _ = Nothing
 findstuff tokens@(Token "pattern" _ : Token name pos : Token "::" _ : sig) _ =
-        trace_ "findstuff pattern type annotation" tokens $
-        [FoundThing (FTPatternTypeDef (concatTokens sig)) name pos]
+        trace_ "findstuff pattern type annotation" tokens [FoundThing (FTPatternTypeDef (concatTokens sig)) name pos]
 findstuff tokens@(Token "pattern" _ : Token name pos : xs) scope =
         trace_ "findstuff pattern" tokens $
         FoundThing FTPattern name pos : findstuff xs scope
@@ -493,7 +488,7 @@ splitByNL _ _ = []
 getTopLevelIndent :: Bool -> [[Token]] -> Int
 getTopLevelIndent _ [] = 0 -- (no import found, assuming indent 0: this can be
                            -- done better but should suffice for most needs
-getTopLevelIndent isLiterate ((nl:next:_):xs) = if "import" == (tokenString next)
+getTopLevelIndent isLiterate ((nl:next:_):xs) = if "import" == tokenString next
                           then let (NewLine i) = nl in i
                           else getTopLevelIndent isLiterate xs
 getTopLevelIndent isLiterate (_:xs) = getTopLevelIndent isLiterate xs
@@ -515,17 +510,17 @@ fromLiterate file lns =
     else (False, lns)
 
   where unlit, returnCode :: [(String, Int)] -> [(String, Int)]
-        unlit ((('>':' ':xs),n):ns) = ((' ':xs),n):unlit(ns) -- unlit keeps space, so do we
+        unlit (('>':' ':xs,n):ns) = (' ':xs,n):unlit ns -- unlit keeps space, so do we
         unlit ((line,_):ns) = if "\\begin{code}" `isPrefixOf` line then returnCode ns else unlit ns
         unlit [] = []
 
         -- in \begin{code} block
-        returnCode (t@(line,_):ns) = if "\\end{code}" `isPrefixOf` line then unlit ns else t:(returnCode ns)
+        returnCode (t@(line,_):ns) = if "\\end{code}" `isPrefixOf` line then unlit ns else t:returnCode ns
         returnCode [] = [] -- unexpected - hasktags does tagging, not compiling, thus don't treat missing \end{code} to be an error
 
 -- suffixes: [".hs",".lhs"], use "" to match all files
 dirToFiles :: Bool -> [String] -> FilePath -> IO [ FilePath ]
-dirToFiles _ _ "STDIN" = fmap lines $ hGetContents stdin
+dirToFiles _ _ "STDIN" = lines <$> getContents
 dirToFiles followSyms suffixes p = do
   isD <- doesDirectoryExist p
 #if MIN_VERSION_directory(1,3,0)
@@ -533,15 +528,14 @@ dirToFiles followSyms suffixes p = do
 #else
   isSymLink <- isSymbolicLink p
 #endif
-  case isD of
-    False -> return $ if matchingSuffix then [p] else []
-    True ->
-      if isSymLink && not followSyms
+  if isD
+    then if isSymLink && not followSyms
         then return []
         else do
           -- filter . .. and hidden files .*
           contents <- filter ((/=) '.' . head) `fmap` getDirectoryContents p
-          concat `fmap` (mapM (dirToFiles followSyms suffixes . (</>) p) contents)
+          concat `fmap` mapM (dirToFiles followSyms suffixes . (</>) p) contents
+    else return [p | matchingSuffix ]
   where matchingSuffix = any (`isSuffixOf` p) suffixes
 
 concatTokens :: [Token] -> String
@@ -558,6 +552,5 @@ concatTokens = smartUnwords . map (\(Token name _) -> name) .  filter (not . isN
 
 extractOperator :: [Token] -> (String, [Token])
 extractOperator ts@(Token "(" _ : _) =
-    (\(a, b) -> (foldr ((++) . tokenString) ")" a, tail' b)) $
-        break ((== ")") . tokenString) ts
+    foldr ((++) . tokenString) ")" *** tail $ break ((== ")") . tokenString) ts
 extractOperator _ = ("", [])
