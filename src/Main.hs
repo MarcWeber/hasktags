@@ -5,18 +5,26 @@ module Main (main) where
 import Hasktags
 
 import Data.Monoid
+import Data.Set (Set, notMember, fromList, union)
+import qualified Data.Set as Set
+import Control.Monad (unless, forM)
 import Options.Applicative
 import Options.Applicative.Help.Pretty (text, line)
 import System.IO (IOMode (AppendMode, WriteMode))
+import System.Directory (doesFileExist)
+import System.Environment (getArgs)
+import System.Exit (die)
 
 data Options = Options
   { _mode :: Mode
+  , _optionFiles :: [FilePath]
   , _files :: [FilePath]
-  }
+  } deriving Show
 
 options :: Parser Options
 options = Options
     <$> mode
+    <*> many optionFiles
     <*> files
   where
     mode :: Parser Mode
@@ -103,13 +111,37 @@ options = Options
     files :: Parser [FilePath]
     files = some $ argument str (metavar "<files or directories...>")
 
-parseArgs :: IO Options
-parseArgs = execParser opts
+    optionFiles :: Parser FilePath
+    optionFiles = strOption $
+         long "options"
+      <> metavar "FILE"
+      <> help "read additional options from file. The file should contain one option per line"
+
+type Argument = String
+
+parseArgs :: [Argument] -> Set FilePath -> IO Options
+parseArgs args parsedOptionFiles = do
+  parsedOptions@Options{..} <- handleParseResult $ execParserPure defaultPrefs opts args
+
+  let filesToParse = nonParsedFiles _optionFiles
+
+  if null filesToParse
+    then return parsedOptions
+    else do
+      strings <- forM filesToParse $ \file -> do
+        exists <- doesFileExist file
+        unless exists (die $ file ++ " from --options doesn't exist")
+        lines <$> readFile file
+      let flagsFromFile = concat strings
+      parseArgs (args ++ flagsFromFile) (fromList filesToParse `union` parsedOptionFiles)
+
   where
+    nonParsedFiles = filter (`notMember` parsedOptionFiles)
+
     opts = info (options <**> helper) $
          fullDesc
       <> progDescDoc (Just $
-          replaceDirsInfo <> line <> line
+             replaceDirsInfo <> line <> line
           <> symlinksInfo <> line <> line
           <> stdinInfo)
 
@@ -122,7 +154,9 @@ parseArgs = execParser opts
 
 main :: IO ()
 main = do
-  Options{..} <- parseArgs
+  args <- getArgs
+  Options{..} <- parseArgs args Set.empty
+
   generate _mode _files
 
 -- Local Variables:

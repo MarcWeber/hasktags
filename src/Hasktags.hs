@@ -117,6 +117,7 @@ data Tags =
     Ctags
   | Etags
   | Both
+  deriving Show
 
 data Mode = Mode
   { _tags             :: Tags
@@ -127,7 +128,7 @@ data Mode = Mode
   , _followSymlinks   :: Bool
   , _suffixes         :: [String]
   , _absoluteTagPaths :: Bool
-  }
+  } deriving Show
 
 data Token = Token String Pos
             | NewLine Int -- space 8*" " = "\t"
