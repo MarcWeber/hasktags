@@ -38,7 +38,7 @@ options = Options
       <*> suffixes
       <*> absoluteTagPaths
     ctags :: Parser Tags
-    ctags = flag Both Etags $
+    ctags = flag Both Ctags $
          long "ctags"
       <> short 'c'
       <> help "generate CTAGS file (ctags)"
