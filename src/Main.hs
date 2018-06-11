@@ -7,7 +7,7 @@ import Hasktags
 import Data.Monoid
 import Data.Set (Set, notMember, fromList, union)
 import qualified Data.Set as Set
-import Control.Monad (unless, forM)
+import Control.Monad (unless)
 import Options.Applicative
 import Options.Applicative.Help.Pretty (text, line)
 import System.IO (IOMode (AppendMode, WriteMode))
@@ -128,15 +128,24 @@ parseArgs args parsedOptionFiles = do
   if null filesToParse
     then return parsedOptions
     else do
-      strings <- forM filesToParse $ \file -> do
-        exists <- doesFileExist file
-        unless exists (die $ file ++ " from --options doesn't exist")
-        lines <$> readFile file
-      let flagsFromFile = concat strings
-      parseArgs (args ++ flagsFromFile) (fromList filesToParse `union` parsedOptionFiles)
+      mapM_ dieIfFilesDoesntExist filesToParse
+      newFlags <- parseArgsFromFiles filesToParse
+      parseArgs (args ++ newFlags) (fromList filesToParse `union` parsedOptionFiles)
 
   where
+    dieIfFilesDoesntExist :: FilePath -> IO ()
+    dieIfFilesDoesntExist file = do
+          exists <- doesFileExist file
+          unless exists (die $ file ++ " from --options doesn't exist")
+
+    nonParsedFiles :: [FilePath] -> [FilePath]
     nonParsedFiles = filter (`notMember` parsedOptionFiles)
+
+    parseArgsFromFiles :: [FilePath] -> IO [Argument]
+    parseArgsFromFiles fps = concat <$> mapM parseArgsFromFile fps
+      where
+        parseArgsFromFile :: FilePath -> IO [Argument]
+        parseArgsFromFile fp = lines <$> readFile fp
 
     opts = info (options <**> helper) $
          fullDesc
@@ -144,13 +153,13 @@ parseArgs args parsedOptionFiles = do
              replaceDirsInfo <> line <> line
           <> symlinksInfo <> line <> line
           <> stdinInfo)
-
-    replaceDirsInfo = text $ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs"
-      ++ "Thus hasktags . tags all important files in the current directory."
-    symlinksInfo = text $ "If directories are symlinks they will not be followed"
-      ++ "unless you pass -L."
-    stdinInfo = text $ "A special file \"STDIN\" will make hasktags read the line separated file"
-      ++ "list to be tagged from STDIN."
+      where
+        replaceDirsInfo = text $ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs"
+          ++ "Thus hasktags . tags all important files in the current directory."
+        symlinksInfo = text $ "If directories are symlinks they will not be followed"
+          ++ "unless you pass -L."
+        stdinInfo = text $ "A special file \"STDIN\" will make hasktags read the line separated file"
+          ++ "list to be tagged from STDIN."
 
 main :: IO ()
 main = do
