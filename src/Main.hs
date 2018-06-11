@@ -4,16 +4,19 @@
 module Main (main) where
 import Hasktags
 
+import Control.Monad (unless)
 import Data.Monoid
 import Data.Set (Set, notMember, fromList, union)
-import qualified Data.Set as Set
-import Control.Monad (unless)
+import Data.Version (showVersion)
 import Options.Applicative
 import Options.Applicative.Help.Pretty (text, line)
-import System.IO (IOMode (AppendMode, WriteMode))
+import Paths_hasktags (version)
 import System.Directory (doesFileExist)
 import System.Environment (getArgs)
 import System.Exit (die)
+import System.IO (IOMode (AppendMode, WriteMode))
+
+import qualified Data.Set as Set
 
 data Options = Options
   { _mode :: Mode
@@ -147,13 +150,17 @@ parseArgs args parsedOptionFiles = do
         parseArgsFromFile :: FilePath -> IO [Argument]
         parseArgsFromFile fp = lines <$> readFile fp
 
-    opts = info (options <**> helper) $
+    opts = info (options <**> versionFlag <**> helper) $
          fullDesc
       <> progDescDoc (Just $
              replaceDirsInfo <> line <> line
           <> symlinksInfo <> line <> line
           <> stdinInfo)
       where
+        versionFlag = infoOption (showVersion version) $
+             long "version"
+          <> help "show version"
+
         replaceDirsInfo = text $ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs"
           ++ "Thus hasktags . tags all important files in the current directory."
         symlinksInfo = text $ "If directories are symlinks they will not be followed"
