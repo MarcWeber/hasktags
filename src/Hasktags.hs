@@ -416,7 +416,9 @@ findFuncTypeDefs found xs@(Token "(" _ :_) scope =
           case break myBreakF xs of
             (inner@(Token _ p : _), rp : xs') ->
               let merged = Token ( concatMap (\(Token x _) -> x) $ inner ++ [rp] ) p
-              in findFuncTypeDefs found (merged : xs') scope
+              in if any (isNewLine Nothing) inner
+                   then []
+                   else findFuncTypeDefs found (merged : xs') scope
             _ -> []
     where myBreakF (Token ")" _) = True
           myBreakF _             = False
