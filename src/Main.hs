@@ -1,93 +1,179 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Main (main) where
-import           Hasktags
+import Hasktags
 
-import           System.Environment
-
-import           Data.List
-
-import           Control.Monad
-import           System.Console.GetOpt
-import           System.Directory
-import           System.Exit
+import Control.Monad (unless)
+import Data.Monoid
+import Data.Set (Set, notMember, fromList, union)
 import Data.Version (showVersion)
+import Options.Applicative
+import Options.Applicative.Help.Pretty (text, line)
 import Paths_hasktags (version)
+import System.Directory (doesFileExist)
+import System.Environment (getArgs)
+import System.Exit (die)
+import System.IO (IOMode (AppendMode, WriteMode))
 
-hsSuffixesDefault :: Mode
-hsSuffixesDefault =  HsSuffixes [ ".hs", ".lhs", ".hsc" ]
+import qualified Data.Set as Set
 
-options :: [OptDescr Mode]
-options = [ Option "c" ["ctags"]
-            (NoArg CTags) "generate CTAGS file (ctags)"
-          , Option "e" ["etags"]
-            (NoArg ETags) "generate ETAGS file (etags)"
-          , Option "b" ["both"]
-            (NoArg BothTags) "generate both CTAGS and ETAGS"
-          , Option "a" ["append"]
-              (NoArg Append)
-            $ "append to existing CTAGS and/or ETAGS file(s). Afterward this "
-              ++ "file will no longer be sorted!"
-          , Option "o" ["output"]
-            (ReqArg OutRedir "")
-            "output to given file, instead of 'tags', '-' file is stdout"
-          , Option "f" ["file"]
-            (ReqArg OutRedir "")
-            "same as -o, but used as compatibility with ctags"
-          , Option "x" ["extendedctag"]
-            (NoArg ExtendedCtag) "Generate additional information in ctag file."
-          , Option "" ["cache"] (NoArg CacheFiles) "Cache file data."
-          , Option "L" ["follow-symlinks"] (NoArg FollowDirectorySymLinks) "follow symlinks when recursing directories"
-          , Option "S" ["suffixes"] (OptArg suffStr ".hs,.lhs") "list of hs suffixes including \".\""
-          , Option "R" ["tags-absolute"] (NoArg AbsolutePath) "make tags paths absolute. Useful when setting tags files in other directories"
-          , Option "h" ["help"] (NoArg Help) "This help"
-          ]
-  where suffStr Nothing  = hsSuffixesDefault
-        suffStr (Just s) = HsSuffixes $ strToSuffixes s
-        strToSuffixes = lines . map commaToEOL
-        commaToEOL ',' = '\n'
-        commaToEOL x   = x
+data Options = Options
+  { _mode :: Mode
+  , _optionFiles :: [FilePath]
+  , _files :: [FilePath]
+  } deriving Show
 
+options :: Parser Options
+options = Options
+    <$> mode
+    <*> many optionFiles
+    <*> files
+  where
+    mode :: Parser Mode
+    mode = Mode
+      <$> (ctags <|> etags <|> bothTags)
+      <*> extendedCtag
+      <*> appendTags
+      <*> outputRedirection
+      <*> cacheData
+      <*> followSymlinks
+      <*> suffixes
+      <*> absoluteTagPaths
+    ctags :: Parser Tags
+    ctags = flag Both Ctags $
+         long "ctags"
+      <> short 'c'
+      <> help "generate CTAGS file (ctags)"
+
+    etags :: Parser Tags
+    etags = flag Both Etags  $
+         long "etags"
+      <> short 'e'
+      <> help "generate ETAGS file (etags)"
+
+    bothTags :: Parser Tags
+    bothTags = flag' Both $
+         long "both"
+      <> short 'b'
+      <> help "generate both CTAGS and ETAGS (default)"
+
+    extendedCtag :: Parser Bool
+    extendedCtag = switch $
+         long "extendedctag"
+      <> short 'x'
+      <> showDefault
+      <> help "Generate additional information in ctag file."
+
+    appendTags :: Parser IOMode
+    appendTags = flag WriteMode AppendMode $
+         long "append"
+      <> short 'a'
+      <> showDefault
+      <> help "append to existing CTAGS and/or ETAGS file(s). Afterward this file will no longer be sorted!"
+
+    outputRedirection :: Parser TagsFile
+    outputRedirection = strOption $
+         long "output"
+      <> long "file"
+      <> short 'o'
+      <> short 'f'
+      <> metavar "FILE|-"
+      <> value (TagsFile "tags" "TAGS")
+      <> showDefault
+      <> help "output to given file, instead of using the default names. '-' writes to stdout"
+
+    cacheData :: Parser Bool
+    cacheData = switch $
+         long "cache"
+      <> showDefault
+      <> help "cache file data"
+
+    followSymlinks :: Parser Bool
+    followSymlinks = switch $
+         long "follow-symlinks"
+      <> short 'L'
+      <> showDefault
+      <> help "follow symlinks when recursing directories"
+
+    suffixes :: Parser [String]
+    suffixes = option auto $
+         long "suffixes"
+      <> short 'S'
+      <> value [".hs", ".lhs", ".hsc"]
+      <> showDefault
+      <> help "list of hs suffixes including \".\""
+
+    absoluteTagPaths :: Parser Bool
+    absoluteTagPaths = switch $
+         long "tags-absolute"
+      <> short 'R'
+      <> showDefault
+      <> help "make tags paths absolute. Useful when setting tags files in other directories"
+
+    files :: Parser [FilePath]
+    files = some $ argument str (metavar "<files or directories...>")
+
+    optionFiles :: Parser FilePath
+    optionFiles = strOption $
+         long "options"
+      <> metavar "FILE"
+      <> help "read additional options from file. The file should contain one option per line"
+
+type Argument = String
+
+parseArgs :: [Argument] -> Set FilePath -> IO Options
+parseArgs args parsedOptionFiles = do
+  parsedOptions@Options{..} <- handleParseResult $ execParserPure defaultPrefs opts args
+
+  let filesToParse = nonParsedFiles _optionFiles
+
+  if null filesToParse
+    then return parsedOptions
+    else do
+      mapM_ dieIfFilesDoesntExist filesToParse
+      newFlags <- parseArgsFromFiles filesToParse
+      parseArgs (args ++ newFlags) (fromList filesToParse `union` parsedOptionFiles)
+
+  where
+    dieIfFilesDoesntExist :: FilePath -> IO ()
+    dieIfFilesDoesntExist file = do
+          exists <- doesFileExist file
+          unless exists (die $ file ++ " from --options doesn't exist")
+
+    nonParsedFiles :: [FilePath] -> [FilePath]
+    nonParsedFiles = filter (`notMember` parsedOptionFiles)
+
+    parseArgsFromFiles :: [FilePath] -> IO [Argument]
+    parseArgsFromFiles fps = concat <$> mapM parseArgsFromFile fps
+      where
+        parseArgsFromFile :: FilePath -> IO [Argument]
+        parseArgsFromFile fp = lines <$> readFile fp
+
+    opts = info (options <**> versionFlag <**> helper) $
+         fullDesc
+      <> progDescDoc (Just $
+             replaceDirsInfo <> line <> line
+          <> symlinksInfo <> line <> line
+          <> stdinInfo)
+      where
+        versionFlag = infoOption (showVersion version) $
+             long "version"
+          <> help "show version"
+
+        replaceDirsInfo = text $ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs"
+          ++ "Thus hasktags . tags all important files in the current directory."
+        symlinksInfo = text $ "If directories are symlinks they will not be followed"
+          ++ "unless you pass -L."
+        stdinInfo = text $ "A special file \"STDIN\" will make hasktags read the line separated file"
+          ++ "list to be tagged from STDIN."
 
 main :: IO ()
 main = do
-        progName <- getProgName
-        args <- getArgs
-        let usageString =
-                   "Usage: " ++ progName ++ " " ++ showVersion version
-                ++ " [OPTION...] [files or directories...]\n"
-                ++ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs\n"
-                ++ "Thus hasktags . tags all important files in the current\n"
-                ++ "directory.\n"
-                ++ "\n"
-                ++ "If directories are symlinks they will not be followed\n"
-                ++ "unless you pass -L.\n"
-                ++ "\n"
-                ++ "A special file \"STDIN\" will make hasktags read the line separated file\n"
-                ++ "list to be tagged from STDIN.\n"
-        let (modes, files_or_dirs_unexpanded, errs) = getOpt Permute options args
-#if debug
-        print $ "modes: " ++ (show modes)
-#endif
+  args <- getArgs
+  Options{..} <- parseArgs args Set.empty
 
-        files_or_dirs <- if AbsolutePath `elem` modes
-                             then sequence $ map canonicalizePath files_or_dirs_unexpanded
-                             else return files_or_dirs_unexpanded
-        let hsSuffixes = head $ [ s | (HsSuffixes s) <- modes ++ [hsSuffixesDefault] ]
-
-        let followSymLinks = FollowDirectorySymLinks `elem` modes
-
-        filenames
-          <- liftM (nub . concat) $ mapM (dirToFiles followSymLinks hsSuffixes) files_or_dirs
-
-        when (errs /= [] || elem Help modes || files_or_dirs == [])
-             (do putStr $ unlines errs
-                 putStr $ usageInfo usageString options
-                 exitWith (ExitFailure 1))
-
-        when (filenames == []) $ putStrLn "warning: no files found!"
-
-        generate modes filenames
+  generate _mode _files
 
 -- Local Variables:
 -- dante-target: "exe:hasktags"

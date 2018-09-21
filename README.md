@@ -24,7 +24,7 @@ hasktags --etags .
 
 Both formats:
 ```bash
-hasktags --ignore-close-implementation .
+hasktags --both .
 ```
 
 *NB:* Generating both tags generates a file called `TAGS` for Emacs, and one called `ctags` for Vim.

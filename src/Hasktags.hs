@@ -1,40 +1,42 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE RecordWildCards #-}
+
 -- should this be named Data.Hasktags or such?
 module Hasktags (
   FileData,
   generate,
-  findWithCache,
   findThings,
   findThingsInBS,
 
   Mode(..),
+  TagsFile(..),
+  Tags(..),
   --  TODO think about these: Must they be exported ?
-  getMode,
   getOutFile,
 
   dirToFiles
 ) where
 import           Control.Monad              (when)
+import           Control.Arrow              ((***))
 import qualified Data.ByteString.Lazy.Char8 as BS (ByteString, readFile, unpack)
 import qualified Data.ByteString.Lazy.UTF8  as BS8 (fromString)
 import           Data.Char                  (isSpace)
+import           Data.String                (IsString(..))
 import           Data.List                  (isPrefixOf, isSuffixOf, groupBy,
-                                             tails)
+                                             tails, nub)
 import           Data.Maybe                 (maybeToList)
 import           DebugShow                  (trace_)
 import           System.Directory           (doesDirectoryExist, doesFileExist,
                                              getDirectoryContents,
                                              getModificationTime,
+                                             canonicalizePath,
 #if MIN_VERSION_directory(1,3,0)
                                               pathIsSymbolicLink)
 #else
                                               isSymbolicLink)
 #endif
 import           System.FilePath            ((</>))
-import           System.IO                  (Handle,
-                                             IOMode (AppendMode, WriteMode),
-                                             hClose, hGetContents, openFile,
-                                             stdin, stdout)
+import           System.IO                  (Handle, IOMode, hClose, openFile, stdout)
 import           Tags                       (FileData (..), FileName,
                                              FoundThing (..),
                                              FoundThingType (FTClass, FTCons, FTConsAccessor, FTConsGADT, FTData, FTDataGADT, FTFuncImpl, FTFuncTypeDef, FTInstance, FTModule, FTNewtype, FTPattern, FTPatternTypeDef, FTType),
@@ -92,36 +94,41 @@ Really not a easy question - maybe there is an answer - I don't know
 -- Reference: http://ctags.sourceforge.net/FORMAT
 
 
--- | getMode takes a list of modes and extracts the mode with the
---   highest precedence.  These are as follows: Both, CTags, ETags
---   The default case is Both.
-getMode :: [Mode] -> Mode
-getMode [] = BothTags
-getMode xs = maximum xs
-
 -- | getOutFile scans the modes searching for output redirection
 --   if not found, open the file with name passed as parameter.
 --   Handle special file -, which is stdout
-getOutFile :: String -> IOMode -> [Mode] -> IO Handle
-getOutFile _           _        (OutRedir "-" : _) = return stdout
-getOutFile _           openMode (OutRedir f : _)   = openFile f openMode
-getOutFile name        openMode (_:xs)             = getOutFile name openMode xs
-getOutFile defaultName openMode []                 = openFile
-                                                     defaultName
-                                                     openMode
+getOutFile :: String -> IOMode -> IO Handle
+getOutFile filepath openMode
+  | "-" == filepath = return stdout
+  | otherwise       = openFile filepath openMode
 
-data Mode = ExtendedCtag
-          | ETags
-          | CTags
-          | BothTags
-          | Append
-          | OutRedir String
-          | CacheFiles
-          | FollowDirectorySymLinks
-          | Help
-          | HsSuffixes [String]
-          | AbsolutePath
-          deriving (Ord, Eq, Show)
+data TagsFile = TagsFile
+  { _ctagsFile :: FilePath
+  , _etagsFile :: FilePath
+  }
+
+instance Show TagsFile where
+  show TagsFile{..} = "ctags: " ++ _ctagsFile ++ ", etags: " ++ _etagsFile
+
+instance IsString TagsFile where
+  fromString s = TagsFile s s
+
+data Tags =
+    Ctags
+  | Etags
+  | Both
+  deriving Show
+
+data Mode = Mode
+  { _tags             :: Tags
+  , _extendedCtag     :: Bool
+  , _appendTags       :: IOMode
+  , _outputFile       :: TagsFile
+  , _cacheData        :: Bool
+  , _followSymlinks   :: Bool
+  , _suffixes         :: [String]
+  , _absoluteTagPaths :: Bool
+  } deriving Show
 
 data Token = Token String Pos
             | NewLine Int -- space 8*" " = "\t"
@@ -143,34 +150,28 @@ isNewLine _ _                   = False
 trimNewlines :: [Token] -> [Token]
 trimNewlines = filter (not . isNewLine Nothing)
 
-generate :: [Mode] -> [FileName] -> IO ()
-generate modes filenames = do
+generate :: Mode -> [FilePath] -> IO ()
+generate Mode{..} files = do
+  files_or_dirs <- if _absoluteTagPaths
+                          then mapM canonicalizePath files
+                          else return files
 
-  let mode = getMode (filter ( `elem` [BothTags, CTags, ETags] ) modes)
-      openFileMode = if Append `elem` modes
-                     then AppendMode
-                     else WriteMode
-  filedata <- mapM (findWithCache (CacheFiles `elem` modes)) filenames
+  filenames <- (nub . concat) <$> mapM (dirToFiles _followSymlinks _suffixes) files_or_dirs
 
-  when (mode == CTags)
-       (do ctagsfile <- getOutFile "tags" openFileMode modes
-           writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
-           hClose ctagsfile)
+  filedata <- mapM (findWithCache _cacheData) filenames
 
-  when (mode == ETags)
-       (do etagsfile <- getOutFile "TAGS" openFileMode modes
-           writeetagsfile etagsfile filedata
-           hClose etagsfile)
+  writeTags _tags filedata
 
-  -- avoid problem when both is used in combination
-  -- with redirection on stdout
-  when (mode == BothTags)
-       (do etagsfile <- getOutFile "TAGS" openFileMode modes
-           writeetagsfile etagsfile filedata
-           ctagsfile <- getOutFile "ctags" openFileMode modes
-           writectagsfile ctagsfile (ExtendedCtag `elem` modes) filedata
-           hClose etagsfile
-           hClose ctagsfile)
+  where
+    writeTags Ctags filedata = writeFile' _ctagsFile (writectagsfile _extendedCtag filedata)
+    writeTags Etags filedata = writeFile' _etagsFile (writeetagsfile filedata)
+    writeTags Both filedata  = writeTags Ctags filedata >> writeTags Etags filedata
+    writeFile' :: FilePath -> (Handle -> IO ()) -> IO ()
+    writeFile' name f = do
+      file <- getOutFile name _appendTags
+      f file
+      hClose file
+    TagsFile{..} = _outputFile
 
 -- Find the definitions in a file, or load from cache if the file
 -- hasn't changed since last time.
@@ -204,7 +205,7 @@ utf8_to_char8_hack = BS.unpack . BS8.fromString
 -- Find the definitions in a file
 findThings :: FileName -> IO FileData
 findThings filename =
-  fmap (findThingsInBS filename) $ BS.readFile filename
+  findThingsInBS filename <$> BS.readFile filename
 
 findThingsInBS :: String -> BS.ByteString -> FileData
 findThingsInBS filename bs = do
@@ -217,7 +218,7 @@ findThingsInBS filename bs = do
                   cppLine _         = False
                 in filter (not . emptyLine) . filter (not . cppLine)
 
-        let debugStep m = (\s -> trace_ (m ++ " result") s s)
+        let debugStep m s = trace_ (m ++ " result") s s
 
         let (isLiterate, slines) =
               debugStep "fromLiterate"
@@ -256,7 +257,7 @@ findThingsInBS filename bs = do
         let topLevelIndent = debugStep "top level indent" $ getTopLevelIndent isLiterate tokenLines
         let sections = map tail -- strip leading NL (no longer needed)
                        $ filter (not . null)
-                       $ splitByNL (Just (topLevelIndent) )
+                       $ splitByNL (Just topLevelIndent )
                        $ concat (trace_ "tokenLines" tokenLines tokenLines)
         -- only take one of
         -- a 'x' = 7
@@ -278,8 +279,8 @@ findThingsInBS filename bs = do
             skipCons FTData (FTCons _ _)       = False
             skipCons FTDataGADT (FTConsGADT _) = False
             skipCons _ _                       = True
-        let things = iCI $ filterAdjacentFuncImpl $ concatMap (flip findstuff Nothing) $
-                map (\s -> trace_ "section in findThingsInBS" s s) sections
+        let things = iCI $ filterAdjacentFuncImpl $ concatMap (flip findstuff Nothing .
+                (\s -> trace_ "section in findThingsInBS" s s)) sections
         let
           -- If there's a module with the same name of another definition, we
           -- are not interested in the module, but only in the definition.
@@ -336,8 +337,7 @@ contains sub = any (isPrefixOf sub) . tails
 
 findstuff :: [Token] -> Scope -> [FoundThing]
 findstuff (Token "module" _ : Token name pos : _) _ =
-        trace_ "module" pos $
-        [FoundThing FTModule name pos] -- nothing will follow this section
+        trace_ "module" pos [FoundThing FTModule name pos] -- nothing will follow this section
 findstuff tokens@(Token "data" _ : Token name pos : xs) _
         | any ( (== "where"). tokenString ) xs -- GADT
             -- TODO will be found as FTCons (not FTConsGADT), the same for
@@ -358,15 +358,15 @@ findstuff tokens@(Token "newtype" _ : ts@(Token name pos : _))_  =
         -- FoundThing FTNewtype name pos : findstuff xs
 findstuff tokens@(Token "type" _ : Token name pos : xs) _ =
         trace_  "findstuff type" tokens $
-        case (break ((== "where").tokenString) xs) of
+        case break ((== "where").tokenString) xs of
         (ys, []) ->
-          trace_ "findstuff type b1 " ys $ [FoundThing FTType name pos]
+          trace_ "findstuff type b1 " ys [FoundThing FTType name pos]
         (ys, r) ->
           trace_ "findstuff type b2 " (ys, r) $
           FoundThing FTType name pos : fromWhereOn r Nothing
 findstuff tokens@(Token "class" _ : xs) _ =
         trace_  "findstuff class" tokens $
-        case (break ((== "where").tokenString) xs) of
+        case break ((== "where").tokenString) xs of
         (ys, []) ->
           trace_ "findstuff class b1 " ys $
           maybeToList $ className ys
@@ -386,7 +386,7 @@ findstuff tokens@(Token "class" _ : xs) _ =
               _                     -> Nothing
 findstuff tokens@(Token "instance" _ : xs) _ =
         trace_  "findstuff instance" tokens $
-        case (break ((== "where").tokenString) xs) of
+        case break ((== "where").tokenString) xs of
         (ys, []) ->
           trace_ "findstuff instance b1 " ys $
           maybeToList $ instanceName ys
@@ -398,8 +398,7 @@ findstuff tokens@(Token "instance" _ : xs) _ =
             (map (\a -> if a == '.' then '-' else a) $ concatTokens lst) p
           instanceName _ = Nothing
 findstuff tokens@(Token "pattern" _ : Token name pos : Token "::" _ : sig) _ =
-        trace_ "findstuff pattern type annotation" tokens $
-        [FoundThing (FTPatternTypeDef (concatTokens sig)) name pos]
+        trace_ "findstuff pattern type annotation" tokens [FoundThing (FTPatternTypeDef (concatTokens sig)) name pos]
 findstuff tokens@(Token "pattern" _ : Token name pos : xs) scope =
         trace_ "findstuff pattern" tokens $
         FoundThing FTPattern name pos : findstuff xs scope
@@ -415,10 +414,11 @@ findFuncTypeDefs found (t@(Token _ _): Token "::" _ : sig) scope =
 findFuncTypeDefs found xs@(Token "(" _ :_) scope =
           case break myBreakF xs of
             (inner@(Token _ p : _), rp : xs') ->
-              let merged = Token ( concatMap (\(Token x _) -> x) $ inner ++ [rp] ) p
-              in if any (isNewLine Nothing) inner
-                   then []
-                   else findFuncTypeDefs found (merged : xs') scope
+              let merged = Token ( concatMap (\z -> case z of
+                                                 (Token x _) -> x
+                                                 (NewLine _) -> "")
+                                   $ inner ++ [rp] ) p
+              in findFuncTypeDefs found (merged : xs') scope
             _ -> []
     where myBreakF (Token ")" _) = True
           myBreakF _             = False
@@ -495,7 +495,7 @@ splitByNL _ _ = []
 getTopLevelIndent :: Bool -> [[Token]] -> Int
 getTopLevelIndent _ [] = 0 -- (no import found, assuming indent 0: this can be
                            -- done better but should suffice for most needs
-getTopLevelIndent isLiterate ((nl:next:_):xs) = if "import" == (tokenString next)
+getTopLevelIndent isLiterate ((nl:next:_):xs) = if "import" == tokenString next
                           then let (NewLine i) = nl in i
                           else getTopLevelIndent isLiterate xs
 getTopLevelIndent isLiterate (_:xs) = getTopLevelIndent isLiterate xs
@@ -517,17 +517,17 @@ fromLiterate file lns =
     else (False, lns)
 
   where unlit, returnCode :: [(String, Int)] -> [(String, Int)]
-        unlit ((('>':' ':xs),n):ns) = ((' ':xs),n):unlit(ns) -- unlit keeps space, so do we
+        unlit (('>':' ':xs,n):ns) = (' ':xs,n):unlit ns -- unlit keeps space, so do we
         unlit ((line,_):ns) = if "\\begin{code}" `isPrefixOf` line then returnCode ns else unlit ns
         unlit [] = []
 
         -- in \begin{code} block
-        returnCode (t@(line,_):ns) = if "\\end{code}" `isPrefixOf` line then unlit ns else t:(returnCode ns)
+        returnCode (t@(line,_):ns) = if "\\end{code}" `isPrefixOf` line then unlit ns else t:returnCode ns
         returnCode [] = [] -- unexpected - hasktags does tagging, not compiling, thus don't treat missing \end{code} to be an error
 
 -- suffixes: [".hs",".lhs"], use "" to match all files
 dirToFiles :: Bool -> [String] -> FilePath -> IO [ FilePath ]
-dirToFiles _ _ "STDIN" = fmap lines $ hGetContents stdin
+dirToFiles _ _ "STDIN" = lines <$> getContents
 dirToFiles followSyms suffixes p = do
   isD <- doesDirectoryExist p
 #if MIN_VERSION_directory(1,3,0)
@@ -535,15 +535,14 @@ dirToFiles followSyms suffixes p = do
 #else
   isSymLink <- isSymbolicLink p
 #endif
-  case isD of
-    False -> return $ if matchingSuffix then [p] else []
-    True ->
-      if isSymLink && not followSyms
+  if isD
+    then if isSymLink && not followSyms
         then return []
         else do
           -- filter . .. and hidden files .*
           contents <- filter ((/=) '.' . head) `fmap` getDirectoryContents p
-          concat `fmap` (mapM (dirToFiles followSyms suffixes . (</>) p) contents)
+          concat `fmap` mapM (dirToFiles followSyms suffixes . (</>) p) contents
+    else return [p | matchingSuffix ]
   where matchingSuffix = any (`isSuffixOf` p) suffixes
 
 concatTokens :: [Token] -> String
@@ -560,6 +559,5 @@ concatTokens = smartUnwords . map (\(Token name _) -> name) .  filter (not . isN
 
 extractOperator :: [Token] -> (String, [Token])
 extractOperator ts@(Token "(" _ : _) =
-    (\(a, b) -> (foldr ((++) . tokenString) ")" a, tail' b)) $
-        break ((== ")") . tokenString) ts
+    foldr ((++) . tokenString) ")" *** tail $ break ((== ")") . tokenString) ts
 extractOperator _ = ("", [])
