@@ -18,8 +18,8 @@ module Hasktags (
 ) where
 import           Control.Monad              (when)
 import           Control.Arrow              ((***))
-import qualified Data.ByteString.Lazy.Char8 as BS (ByteString, readFile, unpack)
-import qualified Data.ByteString.Lazy.UTF8  as BS8 (fromString)
+import qualified Data.ByteString.Char8 as BS (ByteString, readFile, unpack)
+import qualified Data.ByteString.UTF8  as BS8 (fromString)
 import           Data.Char                  (isSpace)
 import           Data.String                (IsString(..))
 import           Data.List                  (isPrefixOf, isSuffixOf, groupBy,
