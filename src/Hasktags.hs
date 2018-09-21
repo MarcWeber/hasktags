@@ -414,11 +414,10 @@ findFuncTypeDefs found (t@(Token _ _): Token "::" _ : sig) scope =
 findFuncTypeDefs found xs@(Token "(" _ :_) scope =
           case break myBreakF xs of
             (inner@(Token _ p : _), rp : xs') ->
-              let merged = Token ( concatMap (\z -> case z of
-                                                 (Token x _) -> x
-                                                 (NewLine _) -> "")
-                                   $ inner ++ [rp] ) p
-              in findFuncTypeDefs found (merged : xs') scope
+              let merged = Token ( concatMap (\(Token x _) -> x) $ inner ++ [rp] ) p
+              in if any (isNewLine Nothing) inner
+                   then []
+                   else findFuncTypeDefs found (merged : xs') scope
             _ -> []
     where myBreakF (Token ")" _) = True
           myBreakF _             = False
@@ -559,5 +558,5 @@ concatTokens = smartUnwords . map (\(Token name _) -> name) .  filter (not . isN
 
 extractOperator :: [Token] -> (String, [Token])
 extractOperator ts@(Token "(" _ : _) =
-    foldr ((++) . tokenString) ")" *** tail $ break ((== ")") . tokenString) ts
+    foldr ((++) . tokenString) ")" *** tail' $ break ((== ")") . tokenString) ts
 extractOperator _ = ("", [])
