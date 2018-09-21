@@ -79,6 +79,7 @@ Executable hasktags
       hasktags,
       optparse-applicative,
       containers
+    other-modules: Paths_hasktags
     ghc-options: -Wall
     default-language: Haskell2010
 
