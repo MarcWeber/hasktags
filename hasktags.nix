@@ -1,5 +1,5 @@
 { mkDerivation, base, bytestring, directory, filepath, HUnit, json
-, microlens-platform, stdenv, utf8-string
+, microlens-platform, stdenv, utf8-string, optparse-applicative, containers
 }:
 mkDerivation {
   pname = "hasktags";
@@ -9,7 +9,7 @@ mkDerivation {
   isExecutable = true;
   libraryHaskellDepends = [
     base bytestring directory filepath json microlens-platform
-    utf8-string
+    utf8-string optparse-applicative containers
   ];
   executableHaskellDepends = [ base directory filepath ];
   testHaskellDepends = [
