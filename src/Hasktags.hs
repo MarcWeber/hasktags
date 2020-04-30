@@ -36,7 +36,7 @@ import           System.Directory           (doesDirectoryExist, doesFileExist,
                                               isSymbolicLink)
 #endif
 import           System.FilePath            ((</>))
-import           System.IO                  (Handle, IOMode, hClose, openFile, stdout)
+import           System.IO                  (Handle, IOMode, hClose, openFile, stdout, utf8, hSetEncoding)
 import           Tags                       (FileData (..), FileName,
                                              FoundThing (..),
                                              FoundThingType (FTClass, FTCons, FTConsAccessor, FTConsGADT, FTData, FTDataGADT, FTFuncImpl, FTFuncTypeDef, FTInstance, FTModule, FTNewtype, FTPattern, FTPatternTypeDef, FTType),
@@ -100,7 +100,10 @@ Really not a easy question - maybe there is an answer - I don't know
 getOutFile :: String -> IOMode -> IO Handle
 getOutFile filepath openMode
   | "-" == filepath = return stdout
-  | otherwise       = openFile filepath openMode
+  | otherwise       = do
+    h <- openFile filepath openMode
+    hSetEncoding h utf8
+    pure h
 
 data TagsFile = TagsFile
   { _ctagsFile :: FilePath
