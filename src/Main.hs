@@ -161,11 +161,11 @@ parseArgs args parsedOptionFiles = do
              long "version"
           <> help "show version"
 
-        replaceDirsInfo = text $ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs"
+        replaceDirsInfo = text $ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs "
           ++ "Thus hasktags . tags all important files in the current directory."
-        symlinksInfo = text $ "If directories are symlinks they will not be followed"
+        symlinksInfo = text $ "If directories are symlinks they will not be followed "
           ++ "unless you pass -L."
-        stdinInfo = text $ "A special file \"STDIN\" will make hasktags read the line separated file"
+        stdinInfo = text $ "A special file \"STDIN\" will make hasktags read the line separated file "
           ++ "list to be tagged from STDIN."
 
 main :: IO ()
