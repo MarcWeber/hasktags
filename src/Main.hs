@@ -161,12 +161,21 @@ parseArgs args parsedOptionFiles = do
              long "version"
           <> help "show version"
 
-        replaceDirsInfo = text $ "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs "
-          ++ "Thus hasktags . tags all important files in the current directory."
-        symlinksInfo = text $ "If directories are symlinks they will not be followed "
-          ++ "unless you pass -L."
-        stdinInfo = text $ "A special file \"STDIN\" will make hasktags read the line separated file "
-          ++ "list to be tagged from STDIN."
+        replaceDirsInfo = text $ unwords
+          [
+            "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs"
+          , "Thus hasktags . tags all important files in the current directory."
+          ]
+        symlinksInfo = text $ unwords
+          [
+            "If directories are symlinks they will not be followed"
+          , "unless you pass -L."
+          ]
+        stdinInfo = text $ unwords
+          [
+            "A special file \"STDIN\" will make hasktags read the line separated file "
+          , "list to be tagged from STDIN."
+          ]
 
 main :: IO ()
 main = do
@@ -174,7 +183,3 @@ main = do
   Options{..} <- parseArgs args Set.empty
 
   generate _mode _files
-
--- Local Variables:
--- dante-target: "exe:hasktags"
--- End:
