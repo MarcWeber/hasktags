@@ -1,5 +1,0 @@
-local-packages:
-  hasktags:
-    location: .
-
-default-compiler: "ghc842"
