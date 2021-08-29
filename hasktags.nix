@@ -4,8 +4,8 @@
 }:
 mkDerivation {
   pname = "hasktags";
-  version = "0.71.2";
-  sha256 = "1s2k9qrgy1jily96img2pmn7g35mwnnfiw6si3aw32jfhg5zsh1c";
+  version = "0.72.0";
+  src = ./.;
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
