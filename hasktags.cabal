@@ -18,8 +18,9 @@ build-type: Simple
 cabal-version: >=1.10
 
 tested-with:
+  GHC == 9.2.1
   GHC == 9.0.1
-  GHC == 8.10.4
+  GHC == 8.10.7
   GHC == 8.8.4
   GHC == 8.6.5
   GHC == 8.4.4
@@ -66,32 +67,48 @@ source-repository head
   location: http://github.com/MarcWeber/hasktags
 
 library
-  default-language:  Haskell2010
   hs-source-dirs:    src
-  ghc-options:       -Wall
+  default-language:  Haskell2010
   exposed-modules:   Hasktags
   other-modules:     Tags, DebugShow
   build-depends:
-    utf8-string,
-    base >= 4.8 && < 5,
-    bytestring >= 0.9 && < 0.11,
-    directory >= 1.2.6 && < 1.4,
-    filepath,
-    json >= 0.5 && < 0.11,
-    microlens-platform >= 0.3.8.0 && < 0.5
+      base               >= 4.8     && < 5
+    , bytestring         >= 0.9     && < 0.12
+    , directory          >= 1.2.6   && < 1.4
+    , filepath
+    , json               >= 0.5     && < 0.11
+    , microlens-platform >= 0.3.8.0 && < 0.5
+    , utf8-string
+
+  ghc-options:
+    -Wall
+  if impl(ghc >= 8.0)
+    ghc-options:
+      -Wcompat
+  -- 2021-11-20 Andreas Abel
+  -- GHC 9.2.1 has a new warning about pattern-lambdas and pattern-lets
+  -- that is distracting.
+  if impl(ghc == 9.2.1)
+    ghc-options:
+      -Wno-incomplete-uni-patterns
 
 Executable hasktags
-    Main-Is: src/Main.hs
-    Build-Depends:
-      base,
-      directory,
-      filepath,
-      hasktags,
-      optparse-applicative,
-      containers
-    other-modules: Paths_hasktags
-    ghc-options: -Wall
-    default-language: Haskell2010
+  Main-Is: src/Main.hs
+  default-language: Haskell2010
+  Build-Depends:
+      hasktags
+    , base
+    , containers
+    , directory
+    , filepath
+    , optparse-applicative
+  other-modules: Paths_hasktags
+
+  ghc-options:
+    -Wall
+  if impl(ghc >= 8.0)
+    ghc-options:
+      -Wcompat
 
   if flag(debug)
     cpp-options: -Ddebug
@@ -100,18 +117,23 @@ Test-Suite testsuite
   Type: exitcode-stdio-1.0
   Main-Is: Test.hs
   hs-source-dirs: src, tests
-  Build-Depends:
-                utf8-string,
-                base,
-                bytestring,
-                directory,
-                filepath,
-                json,
-                HUnit,
-                microlens-platform
-  other-modules: Tags, Hasktags, DebugShow
-  ghc-options: -Wall
   default-language: Haskell2010
+  Build-Depends:
+      base
+    , bytestring
+    , directory
+    , filepath
+    , json
+    , microlens-platform
+    , utf8-string
+    , HUnit
+  other-modules: Tags, Hasktags, DebugShow
+
+  ghc-options:
+    -Wall
+  if impl(ghc >= 8.0)
+    ghc-options:
+      -Wcompat
 
   if flag(debug)
     cpp-options: -Ddebug
