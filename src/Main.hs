@@ -9,7 +9,7 @@ import Data.Monoid
 import Data.Set (Set, notMember, fromList, union)
 import Data.Version (showVersion)
 import Options.Applicative
-import Options.Applicative.Help.Pretty (text, line)
+import Options.Applicative.Help.Pretty (pretty, line)
 import Paths_hasktags (version)
 import System.Directory (doesFileExist)
 import System.Environment (getArgs)
@@ -161,17 +161,17 @@ parseArgs args parsedOptionFiles = do
              long "version"
           <> help "show version"
 
-        replaceDirsInfo = text $ unwords
+        replaceDirsInfo = pretty $ unwords
           [
             "directories will be replaced by DIR/**/*.hs DIR/**/*.lhs"
           , "Thus hasktags . tags all important files in the current directory."
           ]
-        symlinksInfo = text $ unwords
+        symlinksInfo = pretty $ unwords
           [
             "If directories are symlinks they will not be followed"
           , "unless you pass -L."
           ]
-        stdinInfo = text $ unwords
+        stdinInfo = pretty $ unwords
           [
             "A special file \"STDIN\" will make hasktags read the line separated file "
           , "list to be tagged from STDIN."
