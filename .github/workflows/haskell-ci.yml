@@ -6,16 +6,20 @@
 #
 #   haskell-ci regenerate
 #
-# For more information, see https://github.com/haskell-CI/haskell-ci
+# For more information, see https://github.com/andreasabel/haskell-ci
 #
-# version: 0.16.4
+# version: 0.17.20231012
 #
-# REGENDATA ("0.16.4",["github","hasktags.cabal"])
+# REGENDATA ("0.17.20231012",["github","hasktags.cabal"])
 #
 name: Haskell-CI
 on:
-  - push
-  - pull_request
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 jobs:
   linux:
     name: Haskell-CI - Linux - ${{ matrix.compiler }}
@@ -23,19 +27,24 @@ jobs:
     timeout-minutes:
       60
     container:
-      image: buildpack-deps:bionic
+      image: buildpack-deps:focal
     continue-on-error: ${{ matrix.allow-failure }}
     strategy:
       matrix:
         include:
-          - compiler: ghc-9.6.2
+          - compiler: ghc-9.8.1
             compilerKind: ghc
-            compilerVersion: 9.6.2
+            compilerVersion: 9.8.1
             setup-method: ghcup
             allow-failure: false
-          - compiler: ghc-9.4.5
+          - compiler: ghc-9.6.3
             compilerKind: ghc
-            compilerVersion: 9.4.5
+            compilerVersion: 9.6.3
+            setup-method: ghcup
+            allow-failure: false
+          - compiler: ghc-9.4.7
+            compilerKind: ghc
+            compilerVersion: 9.4.7
             setup-method: ghcup
             allow-failure: false
           - compiler: ghc-9.2.8
@@ -56,27 +65,27 @@ jobs:
           - compiler: ghc-8.8.4
             compilerKind: ghc
             compilerVersion: 8.8.4
-            setup-method: hvr-ppa
+            setup-method: ghcup
             allow-failure: false
           - compiler: ghc-8.6.5
             compilerKind: ghc
             compilerVersion: 8.6.5
-            setup-method: hvr-ppa
+            setup-method: ghcup
             allow-failure: false
           - compiler: ghc-8.4.4
             compilerKind: ghc
             compilerVersion: 8.4.4
-            setup-method: hvr-ppa
+            setup-method: ghcup
             allow-failure: false
           - compiler: ghc-8.2.2
             compilerKind: ghc
             compilerVersion: 8.2.2
-            setup-method: hvr-ppa
+            setup-method: ghcup
             allow-failure: false
           - compiler: ghc-8.0.2
             compilerKind: ghc
             compilerVersion: 8.0.2
-            setup-method: hvr-ppa
+            setup-method: ghcup
             allow-failure: false
           - compiler: ghc-7.10.3
             compilerKind: ghc
@@ -88,11 +97,12 @@ jobs:
       - name: apt
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends gnupg ca-certificates dirmngr curl git software-properties-common libtinfo5
+          apt-get install -y --no-install-recommends gnupg ca-certificates dirmngr curl git software-properties-common libtinfo5 libnuma-dev
           if [ "${{ matrix.setup-method }}" = ghcup ]; then
             mkdir -p "$HOME/.ghcup/bin"
-            curl -sL https://downloads.haskell.org/ghcup/0.1.19.2/x86_64-linux-ghcup-0.1.19.2 > "$HOME/.ghcup/bin/ghcup"
+            curl -sL https://downloads.haskell.org/ghcup/0.1.19.5/x86_64-linux-ghcup-0.1.19.5 > "$HOME/.ghcup/bin/ghcup"
             chmod a+x "$HOME/.ghcup/bin/ghcup"
+            "$HOME/.ghcup/bin/ghcup" config add-release-channel https://raw.githubusercontent.com/haskell/ghcup-metadata/master/ghcup-prereleases-0.0.7.yaml;
             "$HOME/.ghcup/bin/ghcup" install ghc "$HCVER" || (cat "$HOME"/.ghcup/logs/*.* && false)
             "$HOME/.ghcup/bin/ghcup" install cabal 3.10.1.0 || (cat "$HOME"/.ghcup/logs/*.* && false)
           else
@@ -100,8 +110,9 @@ jobs:
             apt-get update
             apt-get install -y "$HCNAME"
             mkdir -p "$HOME/.ghcup/bin"
-            curl -sL https://downloads.haskell.org/ghcup/0.1.19.2/x86_64-linux-ghcup-0.1.19.2 > "$HOME/.ghcup/bin/ghcup"
+            curl -sL https://downloads.haskell.org/ghcup/0.1.19.5/x86_64-linux-ghcup-0.1.19.5 > "$HOME/.ghcup/bin/ghcup"
             chmod a+x "$HOME/.ghcup/bin/ghcup"
+            "$HOME/.ghcup/bin/ghcup" config add-release-channel https://raw.githubusercontent.com/haskell/ghcup-metadata/master/ghcup-prereleases-0.0.7.yaml;
             "$HOME/.ghcup/bin/ghcup" install cabal 3.10.1.0 || (cat "$HOME"/.ghcup/logs/*.* && false)
           fi
         env:
@@ -116,10 +127,12 @@ jobs:
           echo "CABAL_CONFIG=$HOME/.cabal/config" >> "$GITHUB_ENV"
           HCDIR=/opt/$HCKIND/$HCVER
           if [ "${{ matrix.setup-method }}" = ghcup ]; then
-            HC=$HOME/.ghcup/bin/$HCKIND-$HCVER
+            HC=$("$HOME/.ghcup/bin/ghcup" whereis ghc "$HCVER")
+            HCPKG=$(echo "$HC" | sed 's#ghc$#ghc-pkg#')
+            HADDOCK=$(echo "$HC" | sed 's#ghc$#haddock#')
             echo "HC=$HC" >> "$GITHUB_ENV"
-            echo "HCPKG=$HOME/.ghcup/bin/$HCKIND-pkg-$HCVER" >> "$GITHUB_ENV"
-            echo "HADDOCK=$HOME/.ghcup/bin/haddock-$HCVER" >> "$GITHUB_ENV"
+            echo "HCPKG=$HCPKG" >> "$GITHUB_ENV"
+            echo "HADDOCK=$HADDOCK" >> "$GITHUB_ENV"
             echo "CABAL=$HOME/.ghcup/bin/cabal-3.10.1.0 -vnormal+nowrap" >> "$GITHUB_ENV"
           else
             HC=$HCDIR/bin/$HCKIND
@@ -185,7 +198,7 @@ jobs:
           chmod a+x $HOME/.cabal/bin/cabal-plan
           cabal-plan --version
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: source
       - name: initial cabal.project for sdist

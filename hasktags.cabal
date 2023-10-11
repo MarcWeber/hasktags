@@ -1,5 +1,7 @@
+cabal-version: >=1.10
 Name: hasktags
 Version: 0.73.0
+x-revision: 2
 Copyright: The University Court of the University of Glasgow
 License: BSD3
 License-File: LICENSE
@@ -15,11 +17,11 @@ Description:
   Produces ctags "tags" and etags "TAGS" files for Haskell programs.
 Category: Development
 build-type: Simple
-cabal-version: >=1.10
 
 tested-with:
-  GHC == 9.6.2
-  GHC == 9.4.5
+  GHC == 9.8.1
+  GHC == 9.6.3
+  GHC == 9.4.7
   GHC == 9.2.8
   GHC == 9.0.2
   GHC == 8.10.7
@@ -75,7 +77,7 @@ library
   other-modules:     Tags, DebugShow
   build-depends:
       base               >= 4.8     && < 5
-    , bytestring         >= 0.9     && < 0.12
+    , bytestring         >= 0.9     && < 0.13
     , directory          >= 1.2.6   && < 1.4
     , filepath
     , json               >= 0.5     && < 0.12
