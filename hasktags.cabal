@@ -21,7 +21,7 @@ build-type: Simple
 tested-with:
   GHC == 9.8.1
   GHC == 9.6.3
-  GHC == 9.4.7
+  GHC == 9.4.8
   GHC == 9.2.8
   GHC == 9.0.2
   GHC == 8.10.7
@@ -30,7 +30,6 @@ tested-with:
   GHC == 8.4.4
   GHC == 8.2.2
   GHC == 8.0.2
-  GHC == 7.10.3
 
 extra-source-files:
   README.md
@@ -76,7 +75,7 @@ library
   exposed-modules:   Hasktags
   other-modules:     Tags, DebugShow
   build-depends:
-      base               >= 4.8     && < 5
+      base               >= 4.9     && < 5
     , bytestring         >= 0.9     && < 0.13
     , directory          >= 1.2.6   && < 1.4
     , filepath
@@ -86,9 +85,7 @@ library
 
   ghc-options:
     -Wall
-  if impl(ghc >= 8.0)
-    ghc-options:
-      -Wcompat
+    -Wcompat
   -- 2021-11-20 Andreas Abel
   -- GHC 9.2.1 has a new warning about pattern-lambdas and pattern-lets
   -- that is distracting.
@@ -110,9 +107,7 @@ Executable hasktags
 
   ghc-options:
     -Wall
-  if impl(ghc >= 8.0)
-    ghc-options:
-      -Wcompat
+    -Wcompat
 
   if flag(debug)
     cpp-options: -Ddebug
@@ -135,9 +130,7 @@ Test-Suite testsuite
 
   ghc-options:
     -Wall
-  if impl(ghc >= 8.0)
-    ghc-options:
-      -Wcompat
+    -Wcompat
 
   if flag(debug)
     cpp-options: -Ddebug
