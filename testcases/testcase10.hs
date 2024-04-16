@@ -59,18 +59,8 @@ import Data.Monoid
 import Data.Typeable
 import Data.Word(Word)
 
-#if __GLASGOW_HASKELL__ >= 704
 import Control.Monad.ST.Unsafe (unsafeIOToST)
-#else
-import Control.Monad.ST (unsafeIOToST)
-#endif
-
-#if __GLASGOW_HASKELL__ >= 704
 import qualified Control.Monad.ST.Lazy.Unsafe as LazyUnsafe
-#else
-import qualified Control.Monad.ST.Lazy as LazyUnsafe
-#endif
-
 import qualified Control.Monad.ST.Lazy as Lazy
 
 import Control.Monad.Morph
@@ -205,23 +195,7 @@ instance MMonad ResourceT where
 --
 -- Since 0.3.0
 newtype ResourceT m a = ResourceT { unResourceT :: I.IORef ReleaseMap -> m a }
-#if __GLASGOW_HASKELL__ >= 707
         deriving Typeable
-#else
-instance Typeable1 m => Typeable1 (ResourceT m) where
-    typeOf1 = goType undefined
-      where
-        goType :: Typeable1 m => m a -> ResourceT m a -> TypeRep
-        goType m _ =
-            mkTyConApp
-#if __GLASGOW_HASKELL__ >= 704
-                (mkTyCon3 "resourcet" "Control.Monad.Trans.Resource" "ResourceT")
-#else
-                (mkTyCon "Control.Monad.Trans.Resource.ResourceT")
-#endif
-                [ typeOf1 m
-                ]
-#endif
 
 -- | Indicates either an error in the library, or misuse of it (e.g., a
 -- @ResourceT@'s state is accessed after being released).
