@@ -453,8 +453,8 @@ findInfix x scope
 
 findF :: [Token] -> Scope -> [FoundThing]
 findF ts@(Token "(" p : _) scope =
-    let (name, xs) = extractOperator ts in
-    [FoundThing (FTFuncImpl scope) name p | any (("=" ==) . tokenString) xs]
+    let (names, xs) = extractOperator ts in
+    [FoundThing (FTFuncImpl scope) name p | name <- names, any (("=" ==) . tokenString) xs]
 findF (Token name p : xs) scope =
     [FoundThing (FTFuncImpl scope) name p | any (("=" ==) . tokenString) xs]
 findF _ _ = []
@@ -559,7 +559,24 @@ concatTokens = smartUnwords . map (\(Token name _) -> name) .  filter (not . isN
         glueNext (a, "")      = a
         glueNext (a, _)       = a ++ " "
 
-extractOperator :: [Token] -> (String, [Token])
-extractOperator ts@(Token "(" _ : _) =
-    foldr ((++) . tokenString) ")" *** tail' $ break ((== ")") . tokenString) ts
-extractOperator _ = ("", [])
+commaSep :: [Token] -> [[Token]]
+commaSep = go True [] where
+  go _   acc [] = filter (not . null) $ reverse acc
+  go _   acc (Token "," _ : ts) = go True acc ts
+  go new acc (t : ts) = go False acc' ts
+    where
+    acc'
+      | new = [t] : acc
+      | a:as <- acc = (t:a) : as
+      | otherwise = [[t]]
+
+extractOperator :: [Token] -> ([String], [Token])
+extractOperator (Token "(" _ : ts) = (names, post)
+  where
+  (pre, _:post) = break ((== ")") . tokenString) ts
+  flatNames = foldr ((++) . tokenString) "" . filter (not . isNewLine Nothing)
+  names = case commaSep ts of
+    [only] -> ["(" ++ flatNames ts ++ ")"]
+    tss -> map flatNames tss
+-- impossible
+extractOperator _ = ([], [])
