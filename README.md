@@ -9,6 +9,13 @@ What is it for? A tag file is a index containing key items of your project such 
 
 So that you can find / jump to them fast.
 
+## Install
+1. clone this repo
+2. `cd` into the repo directory
+3. run `cabal install`. You should get output similar to `Symlinking 'hasktags'
+   to '/Users/user/.cabal/bin/hasktags'`
+4. source your shell profile. Alternatively you can open a new terminal window
+
 ## HOWTO (GENERATING TAG FILES):
 Build hasktags (standard cabal build)
 
