@@ -1,3 +1,14 @@
+# Tags generator using proper GHC API
+
+# Related work
+- [ghc-tags](https://hackage.haskell.org/package/ghc-tags) 
+  Uses proper GHC API thus not missing some tags
+- https://github.com/bitc/lushtags
+- https://github.com/elaforge/fast-tags
+- http://kingfisher.nfshost.com/sw/gasbag/
+- http://hackage.haskell.org/package/hothasktags
+- http://majutsushi.github.com/tagbar/
+
 # hasktags
 A tool to generate tag files for vim and emacs
 
@@ -7,7 +18,9 @@ What is it for? A tag file is a index containing key items of your project such 
 - data declarations
 - ...
 
-So that you can find / jump to them fast.
+Old but eventually useful tool using its own fuzzy parsing which has advantages
+and disadvantages. See [ghc-tags](https://hackage.haskell.org/package/ghc-tags)
+to learn about alternatives.
 
 ## Install
 1. clone this repo
@@ -108,12 +121,6 @@ Add all people having contributed before Oct 2012
 This includes people contributing to the darcs repository as well as people
 having contributed when this repository has been part of ghc
 
-# Related work
-- https://github.com/bitc/lushtags
-- https://github.com/elaforge/fast-tags
-- http://kingfisher.nfshost.com/sw/gasbag/
-- http://hackage.haskell.org/package/hothasktags
-- http://majutsushi.github.com/tagbar/
 
 And probably much more
 
